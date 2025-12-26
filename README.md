@@ -1,4 +1,10 @@
+<div align="center">
+
 # Steam Friends Fullscreen For Playnite
+![Made for Playnite Fullscreen Themes](https://img.shields.io/badge/Made%20for-Playnite%20Fullscreen%20Themes-A600FF?style=for-the-badge)
+
+</div>
+
 
 Steam Friends Fullscreen is a Playnite plugin designed to display your Steam friends presence directly inside Playnite Fullscreen mode.
 
