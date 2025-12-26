@@ -1,0 +1,27 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" 
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" 
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- Header -->
+    <sys:String x:Key="LOCSteamFriends_Title">Steam Friends Fullscreen</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Subtitle">Affiche le statut de tes amis Steam dans Playnite Fullscreen (le thème doit supporter le plugin).</sys:String>
+
+    <!-- Setup -->
+    <sys:String x:Key="LOCSteamFriends_Setup">Configuration</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiKey">Clé Steam Web API</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Profile">Ton profil Steam (lien ou ID)</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ProfileHelp">Colle le lien de ton profil Steam : https://steamcommunity.com/id/TonNom OU https://steamcommunity.com/profiles/76561...</sys:String>
+
+    <!-- Display -->
+    <sys:String x:Key="LOCSteamFriends_Display">Affichage</sys:String>
+    <sys:String x:Key="LOCSteamFriends_OnlineInfo">Le plugin affiche jusqu’à 15 amis en ligne simultanément. Priorité : en jeu, puis en ligne, absent, occupé.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ShowOffline">Afficher les amis hors ligne</sys:String>
+    <sys:String x:Key="LOCSteamFriends_OfflineInfo">Les amis hors ligne sont optionnels et limités à 40 simultanément pour garantir de bonnes performances.</sys:String>
+
+    <!-- Status -->
+    <sys:String x:Key="LOCSteamFriends_Status">Statut</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Plugin">Plugin :</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Updated">Mis à jour :</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Error">Erreur :</sys:String>
+
+</ResourceDictionary>
