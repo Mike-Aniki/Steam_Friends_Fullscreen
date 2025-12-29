@@ -6,3 +6,9 @@ Packages:
     PackageUrl: https://github.com/Mike-Aniki/Steam_Friends_Fullscreen/releases/download/v1.0/SteamFriendsFullscreen_d8d67c7e-a797-45d7-ae44-3d53ddecc8d1_1_0.pext
     Changelog:
       - First Release
+  - Version: 1.1
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2025-12-29
+    PackageUrl: https://github.com/Mike-Aniki/Steam_Friends_Fullscreen/releases/download/v1.1/SteamFriendsFullscreen_d8d67c7e-a797-45d7-ae44-3d53ddecc8d1_1_1.pext
+    Changelog:
+      - Use plugin data path for avatar cache
