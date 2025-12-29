@@ -85,7 +85,7 @@ namespace SteamFriendsFullscreen
 
             steamClient = new SteamWebApiClient();
 
-            avatarCacheDir = Path.Combine(PlayniteApi.Paths.ExtensionsDataPath, "SteamFriendsFullscreen", "AvatarCache");
+            avatarCacheDir = Path.Combine(GetPluginUserDataPath(), "AvatarCache");
             Directory.CreateDirectory(avatarCacheDir);
 
             // expose Settings 
