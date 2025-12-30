@@ -57,10 +57,14 @@ Each item in the collection exposes the following properties:
 | Property | Type   | Description |
 |---------|--------|-------------|
 | name    | string | Steam display name |
-| state   | string | Friend state (string enum): ingame, online, away, busy, snooze, offline |
+| state   | string | Raw friend state key (for logic & styling): ingame, online, away, busy, snooze, offline |
+| stateLoc | string | Localized state label (resolved by the plugin, with English fallback) |
 | game    | string | Current game name (null when not in-game) |
 | avatar  | string | Local cached avatar URI or null |
 | steamid | string | SteamID64 |
+
+Themes should use `stateLoc` for display purposes.
+The `state` property is intended for triggers, styling and logic only.
 
 ---
 
@@ -76,6 +80,30 @@ Each item in the collection exposes the following properties:
     </ListBox.ItemTemplate>
 </ListBox>
 ```
+### Localization
+
+Steam Friends Fullscreen **does not ship any localization files**.
+
+The plugin exposes **localization keys**, which are resolved using Playnite’s resource system.
+If a key is **not defined by the theme**, the plugin **falls back to English** automatically.
+
+### Supported localization keys
+
+| Loc key | English fallback | Description |
+|-------|------------------|-------------|
+| LOCSteamOnline | Online | Online status label |
+| LOCSteamInGame | In game | In-game status label |
+| LOCSteamAway | Away | Away status label |
+| LOCSteamBusy | Busy | Busy status label |
+| LOCSteamSnooze | Snooze | Snooze status label |
+| LOCSteamOffline | Offline | Offline status label |
+
+Example usage in a fullscreen theme:
+
+```xaml
+<TextBlock Text="{Binding stateLoc}" />
+```
+This automatically displays the localized label (or English fallback if missing).
 
 ---
 
