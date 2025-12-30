@@ -66,9 +66,6 @@ Each item in the collection exposes the following properties:
 Themes should use `stateLoc` for display purposes.
 The `state` property is intended for triggers, styling and logic only.
 
----
-
-
 ### Example
 
 ```xaml
