@@ -104,6 +104,78 @@ This automatically displays the localized label (or English fallback if missing)
 
 ---
 
+## Notifications
+
+Steam Friends Fullscreen can trigger **runtime toast notifications** when a friend's status changes.
+
+The plugin **does not render any toast UI by itself**.  
+Notifications are fully **theme-driven** and exposed via `PluginSettings`.
+
+### Toast runtime properties (theme binding)
+
+| Property | Type | Description |
+|--------|------|-------------|
+| ToastIsVisible | bool | Indicates when a toast should be shown |
+| ToastMessage | string | Notification message (already formatted) |
+| ToastAvatar | string | Friend avatar URI or null |
+| ToastToken | long | Unique value updated per toast (useful for animations) |
+| ToastFlip | bool | Toggle used to trigger animations |
+
+ToastFlip toggles on every notification and should be used to retrigger animations,
+even if the toast is already visible.
+
+### Example (animated toast)
+
+Use `ToastFlip` to retrigger the animation on every notification.
+
+```xaml
+<Border Opacity="0">
+    <Border.RenderTransform>
+        <TranslateTransform X="300"/>
+    </Border.RenderTransform>
+
+    <Border.Style>
+        <Style TargetType="Border">
+            <Style.Triggers>
+                <DataTrigger Binding="{PluginSettings Plugin=SteamFriendsFullscreen, Path=ToastFlip}"
+                             Value="True">
+                    <DataTrigger.EnterActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                 From="0" To="1"
+                                                 Duration="0:0:0.15"/>
+                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                                 From="300" To="0"
+                                                 Duration="0:0:0.25"/>
+                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                 BeginTime="0:0:5"
+                                                 From="1" To="0"
+                                                 Duration="0:0:0.2"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </DataTrigger.EnterActions>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Border.Style>
+
+    <TextBlock Text="{PluginSettings Plugin=SteamFriendsFullscreen, Path=ToastMessage}"/>
+</Border>
+```
+The animation will replay every time ToastFlip changes.
+
+### Localization keys related to notifications
+
+ToastMessage can be localized by theme, with English as the fallback language.
+
+| Loc key | English fallback | Description |
+|--------|------------------|-------------|
+| LOCSteamFriendsToast_GameStart | "{0} started playing {1}" | Friend game start notification |
+| LOCSteamFriendsToast_Online | "{0} is now {1}" | Friend connection notification |
+
+---
+
 ### Important notes
 
 - Refresh interval is fixed to 60 seconds.
