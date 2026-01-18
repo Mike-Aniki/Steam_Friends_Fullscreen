@@ -28,7 +28,8 @@ A compatible Fullscreen theme is required.
 
 ## Notifications (Toast)
 
-Steam Friends Fullscreen can display notifications in different ways, depending on the selected mode.
+Steam Friends Fullscreen can notify you when a friend connects or launches a game.
+Notifications can be shown in different ways depending on the selected mode.
 
 **Playnite notifications**
 >- Notifications appear **only inside Playnite Fullscreen**
