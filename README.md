@@ -10,8 +10,6 @@ Steam Friends Fullscreen is a Playnite plugin designed to display your Steam fri
 
 Displays your Steam friends presence: In-game, Online, Away, Busy, Offline (optional).
 
-The plugin runs exclusively in Playnite Fullscreen mode.
-
 ## Setup
 
 1. Install the plugin from the Playnite Addons database or manually.
