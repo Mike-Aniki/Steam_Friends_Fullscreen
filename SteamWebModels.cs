@@ -79,9 +79,11 @@ namespace SteamFriendsFullscreen
     public class FriendPresenceDto
     {
         public string name { get; set; }
-        public string state { get; set; }   
-        public string game { get; set; }    
+        public string state { get; set; }      // raw: online/ingame/away/busy/offline
+        public string stateLoc { get; set; }   // localized text for the theme
+        public string game { get; set; }
         public string steamid { get; set; }
-        public string avatar { get; set; }  
+        public string avatar { get; set; }
     }
+
 }

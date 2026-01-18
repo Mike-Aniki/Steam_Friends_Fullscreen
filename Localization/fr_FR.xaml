@@ -24,4 +24,27 @@
     <sys:String x:Key="LOCSteamFriends_Updated">Mis à jour :</sys:String>
     <sys:String x:Key="LOCSteamFriends_Error">Erreur :</sys:String>
 
+    <sys:String x:Key="LOCSteamFriends_Notifications">Notifications</sys:String>
+    <sys:String x:Key="LOCSteamFriends_EnableNotifications">Activer les notifications</sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyOnGameStart">Notifier quand un ami lance un jeu (par défaut)</sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyOnConnect">Notifier quand un ami se connecte</sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_NotificationMode">Mode de notification</sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_NotifyOff">Désactivé</sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyPlayniteOnly">Playnite (Fullscreen uniquement)</sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyWindowsOnly">Notifications Windows</sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyBoth">Playnite + Windows</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestNotification">Tester notification Windows</sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_NotificationsHelp">Choisis où afficher les notifications. Les notifications Playnite s’affichent en mode Fullscreen (overlay du thème). Les notifications Windows apparaissent même si Playnite n’est pas au premier plan.</sys:String>
+
+    <sys:String x:Key="LOCSteamFriendsToast_Online">{0} est maintenant {1}</sys:String>
+    <sys:String x:Key="LOCSteamFriendsToast_GameStart">{0} a lancé {1}</sys:String>
+    <sys:String x:Key="LOCSteamFriends_StateOnline">En ligne</sys:String>
+    <sys:String x:Key="LOCSteamFriends_StateInGame">En jeu</sys:String>
+    <sys:String x:Key="LOCSteamFriends_StateAway">Absent</sys:String>
+    <sys:String x:Key="LOCSteamFriends_StateBusy">Occupé</sys:String>
+    <sys:String x:Key="LOCSteamFriends_StateOffline">Hors ligne</sys:String>
+
 </ResourceDictionary>

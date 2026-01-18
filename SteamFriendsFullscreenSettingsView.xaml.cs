@@ -21,5 +21,18 @@ namespace SteamFriendsFullscreen
         {
             InitializeComponent();
         }
+
+        private void TestNotification_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                dynamic dc = DataContext;
+                dc?.Settings?.DebugTestNotification?.Invoke();
+            }
+            catch
+            {
+                // ignore
+            }
+        }
     }
 }

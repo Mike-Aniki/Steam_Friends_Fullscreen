@@ -3,10 +3,11 @@ using Playnite.SDK.Data;
 using Playnite.SDK.Events;
 using Playnite.SDK.Plugins;
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Collections.Concurrent;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -30,6 +31,7 @@ namespace SteamFriendsFullscreen
         private DateTime lastSuccessUtc = DateTime.MinValue;
 
         private SteamWebApiClient steamClient;
+        private WindowsToastService windowsToasts;
 
         private const int FixedRefreshSeconds = 60;
         private const int FixedMaxFriendsShown = 15;
@@ -50,8 +52,21 @@ namespace SteamFriendsFullscreen
         private DateTime steamIdResolveLastUtc = DateTime.MinValue;
         private readonly TimeSpan steamIdResolveTtl = TimeSpan.FromHours(24);
 
+        // ===== Notifications: state tracking =====
+        private readonly Dictionary<string, string> lastState = new Dictionary<string, string>();
+        private readonly Dictionary<string, string> lastGame = new Dictionary<string, string>();
+        private readonly Dictionary<string, DateTime> lastToastUtc = new Dictionary<string, DateTime>();
+
+        private bool hasBaseline = false;
+
+        private CancellationTokenSource toastCts;
+        private static readonly TimeSpan ToastCooldown = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan ToastDuration = TimeSpan.FromSeconds(6);
+
+
         // Anti-stutter UI
         private string lastUiSignature = null;
+        private string lastSelfState = null;
 
         // Cache avatars local
         private string avatarCacheDir;
@@ -84,15 +99,17 @@ namespace SteamFriendsFullscreen
             };
 
             steamClient = new SteamWebApiClient();
+            windowsToasts = new WindowsToastService();
+            windowsToasts.EnsureInitialized();
 
             avatarCacheDir = Path.Combine(GetPluginUserDataPath(), "AvatarCache");
             Directory.CreateDirectory(avatarCacheDir);
 
-            // expose Settings 
             AddSettingsSupportSafe("SteamFriendsFullscreen", "Settings");
 
             StartTimer();
         }
+
 
         private void AddSettingsSupportSafe(string sourceName, string settingsRootPropertyName)
         {
@@ -186,6 +203,246 @@ namespace SteamFriendsFullscreen
                 refreshTimer = null;
             }
         }
+
+        private void ShowToast(string message, string avatar)
+        {
+            toastCts?.Cancel();
+            toastCts = new CancellationTokenSource();
+            var ct = toastCts.Token;
+
+            InvokeOnUi(() =>
+            {
+                Settings.ToastMessage = message;
+                Settings.ToastAvatar = avatar;
+                Settings.ToastToken = DateTime.UtcNow.Ticks;
+                Settings.ToastFlip = !Settings.ToastFlip;
+                Settings.ToastIsVisible = true;
+
+            });
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(ToastDuration, ct).ConfigureAwait(false);
+                    InvokeOnUi(() => Settings.ToastIsVisible = false);
+                }
+                catch
+                {
+                    // cancelled
+                }
+            });
+        }
+
+        public void DebugTriggerTestNotification()
+        {
+            try
+            {
+                if (Settings == null)
+                {
+                    return;
+                }
+
+                var mode = Settings.NotificationOutputMode;
+
+                // Respect the same logic as production
+                if (mode == NotificationOutputMode.Off)
+                {
+                    return;
+                }
+
+                var sendPlaynite = (mode == NotificationOutputMode.PlayniteOnly || mode == NotificationOutputMode.PlayniteAndWindows);
+                var sendWindows = (mode == NotificationOutputMode.WindowsOnly || mode == NotificationOutputMode.PlayniteAndWindows);
+
+                // Respect toggles: if both off -> no notification
+                if (!Settings.NotifyOnConnect && !Settings.NotifyOnGameStart)
+                {
+                    return;
+                }
+
+                // Build a localized test message using the same keys as production
+                var friendName = "FriendName";
+                var stateLoc = LocalizeState("online");
+
+                var tpl = GetStringSafe("LOCSteamFriendsToast_Online", "{0} is now {1}");
+                var msg = string.Format(tpl, friendName, stateLoc);
+
+                var title = friendName;
+
+                if (sendPlaynite)
+                {
+                    ShowToast(msg, null);
+                }
+
+                if (sendWindows)
+                {
+                    windowsToasts?.Show(title, msg, null);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Warn(ex, "Debug test notification failed.");
+            }
+        }
+
+
+
+        private void DetectAndQueueToast(List<FriendPresenceDto> dtos, string selfSteamId64)
+        {
+            if (dtos == null || dtos.Count == 0)
+            {
+                return;
+            }
+
+            var mode = Settings.NotificationOutputMode;
+
+            // Off => baseline only
+            if (mode == NotificationOutputMode.Off)
+            {
+                UpdateBaseline(dtos, selfSteamId64);
+                hasBaseline = true;
+                return;
+            }
+
+            var sendPlaynite = (mode == NotificationOutputMode.PlayniteOnly || mode == NotificationOutputMode.PlayniteAndWindows);
+            var sendWindows = (mode == NotificationOutputMode.WindowsOnly || mode == NotificationOutputMode.PlayniteAndWindows);
+
+            // If user disabled both toggles -> no notifications
+            var wantGameStart = Settings.NotifyOnGameStart;
+            var wantConnect = Settings.NotifyOnConnect;
+
+            if (!wantGameStart && !wantConnect)
+            {
+                UpdateBaseline(dtos, selfSteamId64);
+                hasBaseline = true;
+                return;
+            }
+
+            // First successful refresh: baseline only, no notification spam
+            if (!hasBaseline)
+            {
+                UpdateBaseline(dtos, selfSteamId64);
+                hasBaseline = true;
+                return;
+            }
+
+            var now = DateTime.UtcNow;
+
+            for (int i = 0; i < dtos.Count; i++)
+            {
+                var f = dtos[i];
+                if (f == null || string.IsNullOrWhiteSpace(f.steamid))
+                {
+                    continue;
+                }
+
+                // Self safety (normally not present in dtos anyway)
+                if (!string.IsNullOrWhiteSpace(selfSteamId64) && f.steamid == selfSteamId64)
+                {
+                    continue;
+                }
+
+                var newState = f.state ?? "offline";
+                var newGame = string.IsNullOrWhiteSpace(f.game) ? null : f.game;
+
+                lastState.TryGetValue(f.steamid, out var oldState);
+                lastGame.TryGetValue(f.steamid, out var oldGame);
+
+                oldState = oldState ?? "offline";
+
+                bool shouldToast = false;
+                string message = null;
+
+                // 1) Notify on connect
+                if (wantConnect)
+                {
+                    if (oldState == "offline" && newState != "offline")
+                    {
+                        shouldToast = true;
+                        var tpl = GetStringSafe("LOCSteamFriendsToast_Online", "{0} is now {1}");
+                        message = string.Format(tpl, f.name ?? "Friend", f.stateLoc ?? newState);
+                    }
+                }
+
+                // 2) Notify on game start (only if we didn't already toast)
+                if (!shouldToast && wantGameStart)
+                {
+                    var becameInGame = (oldState != "ingame" && newState == "ingame");
+                    var startedGame = (string.IsNullOrWhiteSpace(oldGame) && !string.IsNullOrWhiteSpace(newGame));
+
+                    if (becameInGame || startedGame)
+                    {
+                        shouldToast = true;
+                        if (!string.IsNullOrWhiteSpace(newGame))
+                        {
+                            var tpl = GetStringSafe("LOCSteamFriendsToast_GameStart", "{0} started playing {1}");
+                            message = string.Format(tpl, f.name ?? "Friend", newGame);
+                        }
+                        else
+                        {
+                            // fallback if Steam doesn't return the game name
+                            var tpl = GetStringSafe("LOCSteamFriendsToast_GameStart", "{0} started playing {1}");
+                            message = string.Format(tpl, f.name ?? "Friend", GetStringSafe("LOCSteamInGame", "In game"));
+                        }
+
+                    }
+                }
+
+                if (shouldToast)
+                {
+                    // Anti-spam cooldown per friend
+                    if (lastToastUtc.TryGetValue(f.steamid, out var last) && (now - last) < ToastCooldown)
+                    {
+                        lastState[f.steamid] = newState;
+                        lastGame[f.steamid] = newGame;
+                        continue;
+                    }
+
+                    lastToastUtc[f.steamid] = now;
+                    if (sendPlaynite)
+                    {
+                        ShowToast(message, f.avatar);
+                    }
+
+                    if (sendWindows)
+                    {
+                        // Titre court + message : Windows aime la sobriété
+                        var title = f.name ?? "Friend";
+                        windowsToasts.Show(title, message, f.avatar);
+                    }
+
+                    lastState[f.steamid] = newState;
+                    lastGame[f.steamid] = newGame;
+                    break;
+
+                }
+
+                // Update snapshot
+                lastState[f.steamid] = newState;
+                lastGame[f.steamid] = newGame;
+            }
+        }
+
+        private void UpdateBaseline(List<FriendPresenceDto> dtos, string selfSteamId64)
+        {
+            for (int i = 0; i < dtos.Count; i++)
+            {
+                var f = dtos[i];
+                if (f == null || string.IsNullOrWhiteSpace(f.steamid))
+                {
+                    continue;
+                }
+
+                if (!string.IsNullOrWhiteSpace(selfSteamId64) && f.steamid == selfSteamId64)
+                {
+                    continue;
+                }
+
+                lastState[f.steamid] = f.state ?? "offline";
+                lastGame[f.steamid] = string.IsNullOrWhiteSpace(f.game) ? null : f.game;
+            }
+        }
+
 
         private void InvokeOnUi(Action action)
         {
@@ -331,6 +588,7 @@ namespace SteamFriendsFullscreen
                 });
 
                 lastUiSignature = null;
+                lastSelfState = null;
                 return;
             }
 
@@ -376,21 +634,37 @@ namespace SteamFriendsFullscreen
                 }
 
 
-                // 2) Presence only (1 call per refresh)
-                var players = await steamClient.GetPlayerSummariesAsync(apiKey, cachedFriendIds).ConfigureAwait(false);
+                // 2) Presence only (1 call per refresh) + include SELF
+                var idsForSummaries = cachedFriendIds.ToList();
+                if (!idsForSummaries.Contains(steamId64))
+                {
+                    idsForSummaries.Add(steamId64);
+                }
+
+                var players = await steamClient.GetPlayerSummariesAsync(apiKey, idsForSummaries).ConfigureAwait(false);
+
+                // Self + friends split
+                var self = players?.FirstOrDefault(p => p.SteamId == steamId64);
+                var friendPlayers = players?.Where(p => p.SteamId != steamId64).ToList()
+                                  ?? new System.Collections.Generic.List<SteamPlayerSummary>();
+
 
                 // 3) DTO + avatar cache (limited)
                 int avatarDownloadsScheduled = 0;
 
-                var dtos = players.Select(p =>
+                var dtos = friendPlayers.Select(p =>
                 {
+                    var rawState = MapState(p);
+
                     var dto = new FriendPresenceDto
                     {
                         name = p.PersonaName,
-                        state = MapState(p),
+                        state = rawState,
+                        stateLoc = LocalizeState(rawState),
                         game = string.IsNullOrWhiteSpace(p.GameExtraInfo) ? null : p.GameExtraInfo,
                         steamid = p.SteamId
                     };
+
 
                     // Avatar: promotes local cache
                     var localPath = GetAvatarFilePath(dto.steamid);
@@ -412,6 +686,59 @@ namespace SteamFriendsFullscreen
 
                     return dto;
                 }).ToList();
+
+                DetectAndQueueToast(dtos, steamId64);
+
+                // ===== Update SELF info =====
+                if (self != null)
+                {
+                    var myState = MapState(self);
+
+                    // Avatar local cache
+                    string myAvatar = null;
+                    var myLocalPath = GetAvatarFilePath(steamId64);
+
+                    if (!string.IsNullOrWhiteSpace(myLocalPath) && File.Exists(myLocalPath))
+                    {
+                        myAvatar = ToFileUri(myLocalPath);
+                    }
+                    else
+                    {
+                        myAvatar = self.AvatarFull;
+                        _ = CacheAvatarAsync(steamId64, self.AvatarFull);
+                    }
+
+                    // ✅ Update stateLoc ONLY if state changed
+                    var stateChanged = !string.Equals(lastSelfState, myState, StringComparison.Ordinal);
+                    if (stateChanged)
+                    {
+                        lastSelfState = myState;
+                    }
+
+                    InvokeOnUi(() =>
+                    {
+                        Settings.SelfName = self.PersonaName;
+                        Settings.SelfState = myState;
+                        Settings.SelfStateLoc = LocalizeState(myState);
+                        Settings.SelfGame = string.IsNullOrWhiteSpace(self.GameExtraInfo) ? null : self.GameExtraInfo;
+                        Settings.SelfAvatar = myAvatar;
+                    });
+                }
+                else
+                {
+                    lastSelfState = "offline";
+
+                    InvokeOnUi(() =>
+                    {
+                        Settings.SelfName = null;
+                        Settings.SelfState = "offline";
+                        Settings.SelfStateLoc = LocalizeState("offline");
+                        Settings.SelfGame = null;
+                        Settings.SelfAvatar = null;
+                    });
+                }
+
+
 
                 // 4) Global counters
                 var onlineCount = dtos.Count(d => d.state != "offline");
@@ -468,6 +795,9 @@ namespace SteamFriendsFullscreen
                     lastSuccessUtc = nowUtc;
                     return;
                 }
+
+
+
 
 
                 lastUiSignature = signature;
@@ -544,6 +874,7 @@ namespace SteamFriendsFullscreen
                     var f = onlineTop[i];
                     sb.Append(f.steamid ?? "").Append("|");
                     sb.Append(f.state ?? "").Append("|");
+                    sb.Append(f.stateLoc ?? "").Append("|"); 
                     sb.Append(f.game ?? "").Append("|");
                     sb.Append(f.avatar ?? "").Append("|"); 
                 }
@@ -557,7 +888,9 @@ namespace SteamFriendsFullscreen
                 {
                     var f = offlineList[i];
                     sb.Append(f.steamid ?? "").Append("|");
-                    sb.Append(f.avatar ?? "").Append("|"); 
+                    sb.Append(f.avatar ?? "").Append("|");
+                    sb.Append(f.stateLoc ?? "").Append("|");
+
                 }
             }
 
@@ -734,6 +1067,39 @@ namespace SteamFriendsFullscreen
             }
         }
 
+        private string GetStringSafe(string key, string fallback)
+        {
+            try
+            {
+                var s = PlayniteApi?.Resources?.GetString(key);
+                if (string.IsNullOrWhiteSpace(s) || s == key)
+                {
+                    return fallback;
+                }
+                return s;
+            }
+            catch
+            {
+                return fallback;
+            }
+        }
+
+        private string LocalizeState(string state)
+        {
+            switch (state)
+            {
+                case "online": return GetStringSafe("LOCSteamFriends_StateOnline", "Online");
+                case "ingame": return GetStringSafe("LOCSteamFriends_StateInGame", "In game");
+                case "away": return GetStringSafe("LOCSteamFriends_StateAway", "Away");
+                case "busy": return GetStringSafe("LOCSteamFriends_StateBusy", "Busy");
+                case "offline": return GetStringSafe("LOCSteamFriends_StateOffline", "Offline");
+                case "snooze": return GetStringSafe("LOCSteamFriends_StateAway", "Away");
+                default: return GetStringSafe("LOCSteamFriends_StateOffline", "Offline");
+            }
+        }
+
+
+
         public override void OnGameStarted(OnGameStartedEventArgs args)
         {
             if (!IsFullscreenMode())
@@ -749,6 +1115,7 @@ namespace SteamFriendsFullscreen
         public override void OnGameStopped(OnGameStoppedEventArgs args)
         {
             pausedUntilUtc = DateTime.MinValue;
+            hasBaseline = false;
 
             if (IsFullscreenMode())
             {

@@ -6,6 +6,14 @@ using System.Collections.ObjectModel;
 
 namespace SteamFriendsFullscreen
 {
+    public enum NotificationOutputMode
+    {
+        Off = 0,
+        PlayniteOnly = 1,
+        WindowsOnly = 2,
+        PlayniteAndWindows = 3
+    }
+
     public class SteamFriendsFullscreenSettings : ObservableObject
     {
         public int RefreshSeconds => 60;
@@ -17,6 +25,37 @@ namespace SteamFriendsFullscreen
 
         // Offline toggle 
         private bool showOffline = false;
+
+        // ===== Notifications (saved) =====
+        // Output mode: Off / Playnite / Windows / Both
+        private NotificationOutputMode notificationOutputMode = NotificationOutputMode.PlayniteOnly;
+
+        public NotificationOutputMode NotificationOutputMode
+        {
+            get => notificationOutputMode;
+            set => SetValue(ref notificationOutputMode, value);
+        }
+
+        // Default: notify when a friend starts a game
+        private bool notifyOnGameStart = true;
+
+        // Optional: notify when a friend comes online
+        private bool notifyOnConnect = false;
+
+        
+
+        public bool NotifyOnGameStart
+        {
+            get => notifyOnGameStart;
+            set => SetValue(ref notifyOnGameStart, value);
+        }
+
+        public bool NotifyOnConnect
+        {
+            get => notifyOnConnect;
+            set => SetValue(ref notifyOnConnect, value);
+        }
+
 
         public string SteamApiKey
         {
@@ -40,7 +79,54 @@ namespace SteamFriendsFullscreen
         {
             showOffline = false;
             Friends = new ObservableCollection<FriendPresenceDto>();
+            notificationOutputMode = NotificationOutputMode.PlayniteOnly;
+            notifyOnGameStart = true;
+            notifyOnConnect = false;
+
         }
+
+        // ===== Toast (runtime, theme-driven) =====
+        private bool toastIsVisible;
+        private string toastMessage;
+        private string toastAvatar;
+        private long toastToken;
+        private bool toastFlip;
+
+        [DontSerialize]
+        public bool ToastIsVisible
+        {
+            get => toastIsVisible;
+            set => SetValue(ref toastIsVisible, value);
+        }
+
+        [DontSerialize]
+        public bool ToastFlip
+        {
+            get => toastFlip;
+            set => SetValue(ref toastFlip, value);
+        }
+
+        [DontSerialize]
+        public string ToastMessage
+        {
+            get => toastMessage;
+            set => SetValue(ref toastMessage, value);
+        }
+
+        [DontSerialize]
+        public string ToastAvatar
+        {
+            get => toastAvatar;
+            set => SetValue(ref toastAvatar, value);
+        }
+
+        [DontSerialize]
+        public long ToastToken
+        {
+            get => toastToken;
+            set => SetValue(ref toastToken, value);
+        }
+
 
         public void EnsureRuntimeCollections()
         {
@@ -113,6 +199,53 @@ namespace SteamFriendsFullscreen
 
         [DontSerialize]
         public string PluginStatus => "OK";
+
+        // ===== Self (my profile) runtime =====
+        private string selfName = null;
+        private string selfState = "offline";
+        private string selfGame = null;
+        private string selfAvatar = null;
+        private string selfStateLoc = "Offline";
+
+        [DontSerialize]
+        public string SelfStateLoc
+        {
+            get => selfStateLoc;
+            set => SetValue(ref selfStateLoc, value);
+        }
+
+
+        [DontSerialize]
+        public string SelfName
+        {
+            get => selfName;
+            set => SetValue(ref selfName, value);
+        }
+
+        [DontSerialize]
+        public string SelfState
+        {
+            get => selfState;
+            set => SetValue(ref selfState, value);
+        }
+
+        [DontSerialize]
+        public string SelfGame
+        {
+            get => selfGame;
+            set => SetValue(ref selfGame, value);
+        }
+
+        [DontSerialize]
+        public string SelfAvatar
+        {
+            get => selfAvatar;
+            set => SetValue(ref selfAvatar, value);
+        }
+        [DontSerialize]
+        public Action DebugTestNotification { get; set; }
+
+
     }
 
     public class SteamFriendsFullscreenSettingsViewModel : ObservableObject, ISettings
@@ -137,7 +270,28 @@ namespace SteamFriendsFullscreen
 
             var savedSettings = plugin.LoadPluginSettings<SteamFriendsFullscreenSettings>();
             Settings = savedSettings ?? new SteamFriendsFullscreenSettings();
+            // Migration (ancienne version -> nouvelle)
+            if (savedSettings != null)
+            {
+                // Si l'ancien setting EnableNotifications existait, on essaye de garder un comportement équivalent.
+                // (Si tu as supprimé complètement EnableNotifications, tu peux retirer ce try/catch.)
+                try
+                {
+                    // Si NotificationOutputMode est resté à Off, on le remet comme avant.
+                    if (Settings.NotificationOutputMode == NotificationOutputMode.Off)
+                    {
+                        Settings.NotificationOutputMode = NotificationOutputMode.PlayniteOnly;
+                    }
+                }
+                catch { }
+            }
+
             Settings.EnsureRuntimeCollections();
+            Settings.DebugTestNotification = () =>
+            {
+                plugin.DebugTriggerTestNotification();
+            };
+
         }
 
         public void BeginEdit()

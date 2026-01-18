@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:sys="clr-namespace:System;assembly=mscorlib"
+             xmlns:local="clr-namespace:SteamFriendsFullscreen"
              mc:Ignorable="d"
              d:DesignWidth="800"
              Background="Transparent"
@@ -165,6 +166,48 @@
                         <TextBlock Text="{DynamicResource LOCSteamFriends_OfflineInfo}" Style="{StaticResource Help}"/>
 
                     </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CardBorder}">
+                <StackPanel>
+
+                    <TextBlock Text="{DynamicResource LOCSteamFriends_Notifications}" FontSize="16" FontWeight="SemiBold"/>
+
+                    <TextBlock Text="{DynamicResource LOCSteamFriends_NotificationMode}" Margin="0,10,0,4" Opacity="0.85"/>
+
+                    <ComboBox SelectedValue="{Binding Settings.NotificationOutputMode}"
+          SelectedValuePath="Tag"
+          Margin="0,0,0,10">
+                        <ComboBoxItem Content="{DynamicResource LOCSteamFriends_NotifyOff}"
+                  Tag="{x:Static local:NotificationOutputMode.Off}" />
+                        <ComboBoxItem Content="{DynamicResource LOCSteamFriends_NotifyPlayniteOnly}"
+                  Tag="{x:Static local:NotificationOutputMode.PlayniteOnly}" />
+                        <ComboBoxItem Content="{DynamicResource LOCSteamFriends_NotifyWindowsOnly}"
+                  Tag="{x:Static local:NotificationOutputMode.WindowsOnly}" />
+                        <ComboBoxItem Content="{DynamicResource LOCSteamFriends_NotifyBoth}"
+                  Tag="{x:Static local:NotificationOutputMode.PlayniteAndWindows}" />
+                    </ComboBox>
+
+                    <TextBlock Text="{DynamicResource LOCSteamFriends_NotificationsHelp}"
+                                Opacity="0.75"
+                                TextWrapping="Wrap"
+                                Margin="0,5,0,5"/>
+
+
+                    <CheckBox Content="{DynamicResource LOCSteamFriends_NotifyOnGameStart}"
+          IsChecked="{Binding Settings.NotifyOnGameStart}"
+          Margin="0,10,0,0"/>
+
+                    <CheckBox Content="{DynamicResource LOCSteamFriends_NotifyOnConnect}"
+          IsChecked="{Binding Settings.NotifyOnConnect}"
+          Margin="0,6,0,0"/>
+
+
+                    <Button Content="{DynamicResource LOCSteamFriends_TestNotification}"
+Margin="0,12,0,0"
+Padding="12,8"
+Click="TestNotification_Click"/>
                 </StackPanel>
             </Border>
 
