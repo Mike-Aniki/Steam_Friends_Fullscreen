@@ -20,3 +20,9 @@ Packages:
       - Added support for displaying the current user Steam presence.
       - User presence follows the same status logic as friends.
       - Status labels are now ready for localization.
+  - Version: 1.3
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2026-01-18
+    PackageUrl: https://github.com/Mike-Aniki/Steam_Friends_Fullscreen/releases/download/v1.3/SteamFriendsFullscreen_d8d67c7e-a797-45d7-ae44-3d53ddecc8d1_1_3.pext
+    Changelog:
+      - Added Windows system notifications support for friend activity (shown in the Windows notification center)
