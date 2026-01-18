@@ -26,7 +26,36 @@ Note:
 This plugin does not render any UI by itself in Fullscreen.  
 A compatible Fullscreen theme is required.
 
----
+## Notifications (Toast)
+
+Steam Friends Fullscreen can display notifications in different ways, depending on the selected mode.
+
+**Playnite notifications**
+>- Notifications appear **only inside Playnite Fullscreen**
+>- They are displayed and animated by the Fullscreen theme
+>- **This mode works only in Fullscreen mode and requires a compatible Fullscreen theme**
+
+_Use this if:_
+_You play exclusively in Playnite Fullscreen and want fully integrated, in-theme notifications._
+
+**Windows notifications**
+>- Notifications use the **Windows system notification center**
+>- They can appear anytime, depending on Windows settings:
+>  - in Desktop mode or Fullscreen mode
+>  - when Playnite is minimized
+>  - while a game is running
+>- Playnite must be running in the background
+
+_Use this if:_
+_You want to receive notifications at all times, even when Playnite is not visible._
+
+**Playnite + Windows**
+>- Notifications appear **both**:
+>  - inside the Fullscreen theme
+>  - as Windows system notifications
+
+_Use this if:_ 
+_you want notifications in Fullscreen *and* outside Playnite._
 
 ## Theme Developers Guide
 
