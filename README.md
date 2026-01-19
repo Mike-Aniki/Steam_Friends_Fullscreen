@@ -22,9 +22,13 @@ Displays friend states: In-game, Online, Away, Busy, Offline (optional).
 4. (Optional) Enable **Show offline friends**
 5. Use a **Fullscreen theme that supports the plugin**
 
-**Note**  
-This plugin does **not render any UI by itself**.  
-A compatible Fullscreen theme is required.
+**Important**
+
+> _**Your Steam profile and Friends List must be set to Public.
+> If either is private, the Steam Web API will return no data and the plugin will display outdated information or nothing at all.**_
+
+This plugin does not provide any UI on its own.
+A compatible Playnite Fullscreen theme is required to display its data.
 
 ## Notifications overview
 
