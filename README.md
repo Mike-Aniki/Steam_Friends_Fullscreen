@@ -1,3 +1,4 @@
+
 <div align="center">
 
 # Steam Friends Fullscreen For Playnite
@@ -5,156 +6,163 @@
 
 </div>
 
+Steam Friends Fullscreen is a Playnite plugin designed to display your Steam friends presence inside **Playnite Fullscreen mode**, with optional **Windows system notifications**.
 
-Steam Friends Fullscreen is a Playnite plugin designed to display your Steam friends presence directly inside Playnite Fullscreen mode.
+It exposes **data, commands, and notification hooks** that Fullscreen themes can use to build a complete Steam friends UI.
 
-Displays your Steam friends presence: In-game, Online, Away, Busy, Offline (optional).
+Displays friend states: In-game, Online, Away, Busy, Offline (optional).
 
 ## Setup
 
 1. Install the plugin from the Playnite Addons database or manually.
-2. Open Playnite → Add-ons → Extensions → Steam Friends Fullscreen
+2. Open **Playnite → Add-ons → Extensions → Steam Friends Fullscreen**
 3. Enter:
-   - Your Steam Web API Key
-   - Your Steam profile URL or SteamID64
-4. (Optional) Enable "Show offline friends"
-5. Use a Fullscreen theme that supports the plugin.
+   - Your **Steam Web API Key**
+   - Your **Steam profile URL or SteamID64**
+4. (Optional) Enable **Show offline friends**
+5. Use a **Fullscreen theme that supports the plugin**
 
-Note:  
-This plugin does not render any UI by itself in Fullscreen.  
+**Note**  
+This plugin does **not render any UI by itself**.  
 A compatible Fullscreen theme is required.
 
-## Notifications (Toast)
+## Notifications overview
 
-Steam Friends Fullscreen can notify you when a friend connects or launches a game.
-Notifications can be shown in different ways depending on the selected mode.
+Steam Friends Fullscreen can notify you when:
+- A friend comes online
+- A friend starts a game
 
-**Playnite notifications**
->- Notifications appear **only inside Playnite Fullscreen**
->- They are displayed and animated by the Fullscreen theme
->- **This mode works only in Fullscreen mode and requires a compatible Fullscreen theme**
+Two independent systems are available:
 
-_Use this if:_
-_You play exclusively in Playnite Fullscreen and want fully integrated, in-theme notifications._
-
-**Windows notifications**
->- Notifications use the **Windows system notification center**
->- They can appear anytime, depending on Windows settings:
->  - in Desktop mode or Fullscreen mode
->  - when Playnite is minimized
->  - while a game is running
->- Playnite must be running in the background
-
-_Use this if:_
-_You want to receive notifications at all times, even when Playnite is not visible._
-
-**Playnite + Windows**
->- Notifications appear **both**:
->  - inside the Fullscreen theme
->  - as Windows system notifications
-
-_Use this if:_ 
-_you want notifications in Fullscreen *and* outside Playnite._
+- **Playnite notifications** → rendered & localized by the Fullscreen theme
+- **Windows notifications** → rendered & localized by the plugin
 
 ## Theme Developers Guide
 
-Steam Friends Fullscreen exposes all its data through PluginSettings.
-Fullscreen themes are responsible for rendering and interaction.
+Steam Friends Fullscreen exposes everything through **PluginSettings**.
+Themes are responsible for UI, layout, styling and animations.
 
-#### Global status
+## Global status bindings
 
-| Property        | Type     | Description                          |
-|-----------------|----------|--------------------------------------|
-| OnlineCount     | int      | Number of online friends             |
-| InGameCount     | int      | Number of friends currently in-game  |
-| OfflineCount    | int      | Number of offline friends            |
-| LastUpdateUtc   | DateTime | Last successful refresh              |
-| LastError       | string   | Last error message (null if OK)      |
-| IsStale         | bool     | Indicates outdated data              |
+| Property | Type | Description |
+|--------|------|-------------|
+| OnlineCount | int | Number of online friends |
+| InGameCount | int | Number of friends currently in-game |
+| OfflineCount | int | Number of offline friends |
+| LastUpdateUtc | DateTime | Last successful refresh |
+| LastError | string | Last error message (null if OK) |
 
----
+**Example**
 
-### Friends collection
+```xaml
+<TextBlock Text="{PluginSettings Plugin=SteamFriendsFullscreen, Path=OnlineCount}" />
+<TextBlock Text="{PluginSettings Plugin=SteamFriendsFullscreen, Path=InGameCount}" />
+```
+
+## Friends collection
 
 ```xaml
 ItemsSource="{PluginSettings Plugin=SteamFriendsFullscreen, Path=Friends}"
 ```
 
-Each item in the collection exposes the following properties:
+Each friend item exposes:
 
-| Property | Type   | Description |
-|---------|--------|-------------|
-| name    | string | Steam display name |
-| state   | string | Raw friend state key (for logic & styling): ingame, online, away, busy, snooze, offline |
-| stateLoc | string | Localized state label (resolved by the plugin, with English fallback) |
-| game    | string | Current game name (null when not in-game) |
-| avatar  | string | Local cached avatar URI or null |
+| Property | Type | Description |
+|--------|------|-------------|
+| name | string | Steam display name |
+| state | string | Raw state key (ingame, online, away, busy, snooze, offline) |
+| stateLoc | string | Localized state label (theme-based, English fallback) |
+| game | string | Current game (null if not in-game) |
+| avatar | string | Local cached avatar URI or null |
 | steamid | string | SteamID64 |
 
-Themes should use `stateLoc` for display purposes.
-The `state` property is intended for triggers, styling and logic only.
-
-### Example
+### Example – simple list
 
 ```xaml
 <ListBox ItemsSource="{PluginSettings Plugin=SteamFriendsFullscreen, Path=Friends}">
     <ListBox.ItemTemplate>
         <DataTemplate>
-            <TextBlock Text="{Binding name}" />
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Image Width="48" Height="48" Source="{Binding avatar}" />
+                <StackPanel>
+                    <TextBlock Text="{Binding name}" />
+                    <TextBlock Text="{Binding stateLoc}" Opacity="0.7"/>
+                </StackPanel>
+            </StackPanel>
         </DataTemplate>
     </ListBox.ItemTemplate>
 </ListBox>
 ```
-### Localization
 
-Steam Friends Fullscreen **does not ship any localization files**.
+## Self user state (your own Steam status)
 
-The plugin exposes **localization keys**, which are resolved using Playnite’s resource system.
-If a key is **not defined by the theme**, the plugin **falls back to English** automatically.
-
-### Supported localization keys
-
-| Loc key | English fallback | Description |
-|-------|------------------|-------------|
-| LOCSteamOnline | Online | Online status label |
-| LOCSteamInGame | In game | In-game status label |
-| LOCSteamAway | Away | Away status label |
-| LOCSteamBusy | Busy | Busy status label |
-| LOCSteamSnooze | Snooze | Snooze status label |
-| LOCSteamOffline | Offline | Offline status label |
-
-Example usage in a fullscreen theme:
-
-```xaml
-<TextBlock Text="{Binding stateLoc}" />
-```
-This automatically displays the localized label (or English fallback if missing).
-
----
-
-## Notifications
-
-Steam Friends Fullscreen can trigger **runtime toast notifications** when a friend's status changes.
-
-The plugin **does not render any toast UI by itself**.  
-Notifications are fully **theme-driven** and exposed via `PluginSettings`.
-
-### Toast runtime properties (theme binding)
+The plugin also exposes **your own Steam profile state**.
 
 | Property | Type | Description |
 |--------|------|-------------|
-| ToastIsVisible | bool | Indicates when a toast should be shown |
-| ToastMessage | string | Notification message (already formatted) |
-| ToastAvatar | string | Friend avatar URI or null |
-| ToastToken | long | Unique value updated per toast (useful for animations) |
-| ToastFlip | bool | Toggle used to trigger animations |
+| SelfName | string | Your Steam display name |
+| SelfState | string | Raw state key |
+| SelfStateLoc | string | Localized label |
+| SelfGame | string | Current game |
+| SelfAvatar | string | Avatar URI |
 
-ToastFlip toggles on every notification and should be used to retrigger animations,
-even if the toast is already visible.
+### Example – display your status
 
-### Example (animated toast)
+```xaml
+<TextBlock Text="{PluginSettings Plugin=SteamFriendsFullscreen, Path=SelfName}" />
+<TextBlock Text="{PluginSettings Plugin=SteamFriendsFullscreen, Path=SelfStateLoc}"
+           Opacity="0.8"/>
+```
 
-Use `ToastFlip` to retrigger the animation on every notification.
+## User status control (commands)
+
+Themes can let users **change their Steam status directly**.
+
+### Exposed commands
+
+| Command | Steam status |
+|-------|--------------|
+| SetStatusOnlineCommand | Online |
+| SetStatusAwayCommand | Away |
+| SetStatusBusyCommand | Busy |
+| SetStatusOfflineCommand | Offline |
+| SetStatusInvisibleCommand | Invisible |
+
+### Example – status buttons
+
+```xaml
+<Button Content="Online"
+        Command="{PluginSettings Plugin=SteamFriendsFullscreen, Path=SetStatusOnlineCommand}" />
+
+<Button Content="Away"
+        Command="{PluginSettings Plugin=SteamFriendsFullscreen, Path=SetStatusAwayCommand}" />
+
+<Button Content="Invisible"
+        Command="{PluginSettings Plugin=SteamFriendsFullscreen, Path=SetStatusInvisibleCommand}" />
+```
+
+**What the plugin handles**
+- Sends `steam://friends/status/...`
+- Updates `SelfState` and `SelfStateLoc`
+- Syncs UI on next refresh
+
+Steam must be running.
+
+## Toast notifications (Fullscreen themes)
+
+Themes receive toast events via PluginSettings.
+
+### Runtime properties
+
+| Property | Type | Description |
+|--------|------|-------------|
+| ToastIsVisible | bool | Toast visibility |
+| ToastMessage | string | Formatted message |
+| ToastAvatar | string | Friend avatar |
+| ToastToken | long | Unique change token |
+| ToastFlip | bool | Animation retrigger |
+
+### Example – animated toast
 
 ```xaml
 <Border Opacity="0">
@@ -176,10 +184,6 @@ Use `ToastFlip` to retrigger the animation on every notification.
                                 <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
                                                  From="300" To="0"
                                                  Duration="0:0:0.25"/>
-                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                 BeginTime="0:0:5"
-                                                 From="1" To="0"
-                                                 Duration="0:0:0.2"/>
                             </Storyboard>
                         </BeginStoryboard>
                     </DataTrigger.EnterActions>
@@ -191,22 +195,27 @@ Use `ToastFlip` to retrigger the animation on every notification.
     <TextBlock Text="{PluginSettings Plugin=SteamFriendsFullscreen, Path=ToastMessage}"/>
 </Border>
 ```
-The animation will replay every time ToastFlip changes.
 
-### Localization keys related to notifications
+## Windows notifications localization (plugin)
 
-ToastMessage can be localized by theme, with English as the fallback language.
+Windows notifications are localized **by the plugin**, using `Localization/*.xaml`.
 
-| Loc key | English fallback | Description |
-|--------|------------------|-------------|
-| LOCSteamFriendsToast_GameStart | "{0} started playing {1}" | Friend game start notification |
-| LOCSteamFriendsToast_Online | "{0} is now {1}" | Friend connection notification |
+| Key | Description |
+|----|-------------|
+| LOCSteamFriendsToast_OnlineShort | Online notification |
+| LOCSteamFriendsToast_GameStartShort | Game start notification |
+| LOCSteamFriends_StateOnline | State label |
+| LOCSteamFriends_StateInGame | State label |
+| LOCSteamFriends_StateOffline | State label |
+
+Theme localization does **not** affect Windows notifications.
 
 ---
 
-### Important notes
+## Notes
 
-- Refresh interval is fixed to 60 seconds.
-- All activity is paused automatically when a game starts.
-- The plugin runs only in Fullscreen mode.
-- Themes should handle empty lists and null avatars.
+- Refresh interval: **60 seconds**
+- Refresh paused during gameplay
+- Plugin UI runs only in Fullscreen mode
+- Windows notifications work in Desktop or in-game
+- Themes must handle null avatars and empty lists
