@@ -80,17 +80,19 @@ namespace SteamFriendsFullscreen
                             var local = uri.LocalPath;
                             if (File.Exists(local))
                             {
-                                builder.AddInlineImage(uri);
+                                // Petit avatar à gauche (discret) + crop rond
+                                builder.AddAppLogoOverride(uri, ToastGenericAppLogoCrop.Circle);
                             }
                         }
                         else
                         {
-                            builder.AddInlineImage(uri);
+                            // URL https
+                            builder.AddAppLogoOverride(uri, ToastGenericAppLogoCrop.Circle);
                         }
                     }
                     else if (File.Exists(imagePathOrUrl))
                     {
-                        builder.AddInlineImage(new Uri(imagePathOrUrl));
+                        builder.AddAppLogoOverride(new Uri(imagePathOrUrl), ToastGenericAppLogoCrop.Circle);
                     }
                 }
 
@@ -101,5 +103,6 @@ namespace SteamFriendsFullscreen
                 logger.Warn(ex, "Windows toast show failed.");
             }
         }
+
     }
 }

@@ -3,6 +3,8 @@ using Playnite.SDK.Data;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Windows.Input;
+
 
 namespace SteamFriendsFullscreen
 {
@@ -245,6 +247,12 @@ namespace SteamFriendsFullscreen
         [DontSerialize]
         public Action DebugTestNotification { get; set; }
 
+        // ===== Commands (runtime) =====
+        [DontSerialize] public ICommand SetStatusOnlineCommand { get; set; }
+        [DontSerialize] public ICommand SetStatusAwayCommand { get; set; }
+        [DontSerialize] public ICommand SetStatusBusyCommand { get; set; }
+        [DontSerialize] public ICommand SetStatusInvisibleCommand { get; set; }
+        [DontSerialize] public ICommand SetStatusOfflineCommand { get; set; }
 
     }
 
@@ -263,6 +271,25 @@ namespace SteamFriendsFullscreen
                 OnPropertyChanged();
             }
         }
+
+        public NotificationOutputMode NotificationOutputMode
+        {
+            get => Settings.NotificationOutputMode;
+            set
+            {
+                if (Settings.NotificationOutputMode == value)
+                {
+                    return;
+                }
+
+                Settings.NotificationOutputMode = value;
+                OnPropertyChanged();
+
+                // Start/Stop timer immediately based on the new mode + current app mode
+                plugin.StartTimer(); // StartTimer() already contains the logic to StopTimer() if not needed
+            }
+        }
+
 
         public SteamFriendsFullscreenSettingsViewModel(SteamFriendsFullscreen plugin)
         {
@@ -292,6 +319,13 @@ namespace SteamFriendsFullscreen
                 plugin.DebugTriggerTestNotification();
             };
 
+            Settings.SetStatusOnlineCommand = new SimpleCommand(() => plugin.SetSteamStatus("online"));
+            Settings.SetStatusAwayCommand = new SimpleCommand(() => plugin.SetSteamStatus("away"));
+            Settings.SetStatusBusyCommand = new SimpleCommand(() => plugin.SetSteamStatus("busy"));
+            Settings.SetStatusInvisibleCommand = new SimpleCommand(() => plugin.SetSteamStatus("invisible"));
+            Settings.SetStatusOfflineCommand = new SimpleCommand(() => plugin.SetSteamStatus("offline"));
+
+
         }
 
         public void BeginEdit()
@@ -304,12 +338,21 @@ namespace SteamFriendsFullscreen
         {
             Settings = editingClone;
             Settings.EnsureRuntimeCollections();
+
+            OnPropertyChanged(nameof(NotificationOutputMode));
+            plugin.StartTimer();
         }
+
 
         public void EndEdit()
         {
             plugin.SavePluginSettings(Settings);
+
+            OnPropertyChanged(nameof(NotificationOutputMode));
+            plugin.StartTimer();
         }
+
+
 
         public bool VerifySettings(out List<string> errors)
         {

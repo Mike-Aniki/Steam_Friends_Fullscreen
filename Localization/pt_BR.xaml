@@ -1,0 +1,68 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" 
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" 
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- Header -->
+    <sys:String x:Key="LOCSteamFriends_Title">Steam Friends Fullscreen</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Subtitle">
+        Exibe o status dos seus amigos da Steam no modo Tela Cheia do Playnite (o tema deve suportar o plugin).
+    </sys:String>
+
+    <!-- Setup -->
+    <sys:String x:Key="LOCSteamFriends_Setup">Configuração</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiKey">Chave da Steam Web API</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Profile">Seu perfil Steam (link ou ID)</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ProfileHelp">
+        Cole o link do seu perfil Steam, por exemplo: https://steamcommunity.com/id/YourName ou https://steamcommunity.com/profiles/76561...
+    </sys:String>
+
+    <!-- Display -->
+    <sys:String x:Key="LOCSteamFriends_Display">Exibição</sys:String>
+    <sys:String x:Key="LOCSteamFriends_OnlineInfo">
+        O plugin exibe até 15 amigos online simultaneamente. Os amigos são priorizados por status: em jogo, online, ausente, ocupado.
+    </sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_ShowOffline">Mostrar amigos offline</sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_OfflineInfo">
+        Amigos offline são opcionais e limitados a 40 para garantir um desempenho suave.
+    </sys:String>
+
+    <!-- Status -->
+    <sys:String x:Key="LOCSteamFriends_Status">Status</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Plugin">Plugin:</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Updated">Atualizado:</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Error">Erro:</sys:String>
+
+    <!-- Notifications -->
+    <sys:String x:Key="LOCSteamFriends_Notifications">Notificações</sys:String>
+    <sys:String x:Key="LOCSteamFriends_EnableNotifications">Ativar notificações</sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyOnGameStart">Notificar quando um amigo iniciar um jogo (padrão)</sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyOnConnect">Notificar quando um amigo ficar online</sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_NotificationMode">Modo de notificação</sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_NotifyOff">Desativado</sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyPlayniteOnly">Playnite (apenas Tela Cheia)</sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyWindowsOnly">Notificações do Windows</sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyBoth">Playnite + Windows</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestNotification">Testar notificação do Windows</sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_NotificationsHelp">
+        Escolha onde e como as notificações serão exibidas.
+As notificações do Playnite aparecem apenas no tema em Tela Cheia.
+As notificações do Windows usam o centro de notificações do sistema e funcionam no modo Desktop ou durante jogos, desde que o Playnite esteja em execução.
+    </sys:String>
+
+    <!-- Toasts -->
+    <sys:String x:Key="LOCSteamFriendsToast_OnlineShort">está agora {0}</sys:String>
+    <sys:String x:Key="LOCSteamFriendsToast_GameStartShort">começou a jogar {0}</sys:String>
+
+    <!-- States -->
+    <sys:String x:Key="LOCSteamFriends_StateOnline">online</sys:String>
+    <sys:String x:Key="LOCSteamFriends_StateInGame">em jogo</sys:String>
+    <sys:String x:Key="LOCSteamFriends_StateAway">ausente</sys:String>
+    <sys:String x:Key="LOCSteamFriends_StateBusy">ocupado</sys:String>
+    <sys:String x:Key="LOCSteamFriends_StateOffline">offline</sys:String>
+
+</ResourceDictionary>

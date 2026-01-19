@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using System.Diagnostics;
 
 namespace SteamFriendsFullscreen
 {
@@ -100,7 +101,6 @@ namespace SteamFriendsFullscreen
 
             steamClient = new SteamWebApiClient();
             windowsToasts = new WindowsToastService();
-            windowsToasts.EnsureInitialized();
 
             avatarCacheDir = Path.Combine(GetPluginUserDataPath(), "AvatarCache");
             Directory.CreateDirectory(avatarCacheDir);
@@ -151,15 +151,34 @@ namespace SteamFriendsFullscreen
             }
         }
 
-
-        private void StartTimer()
+        private bool ShouldRunTimer()
         {
-            // Fullscreen only
-            if (!IsFullscreenMode())
+            if (Settings == null)
+            {
+                return false;
+            }
+
+            // Fullscreen: useful for the theme UI (Playnite toast + lists)
+            if (IsFullscreenMode())
+            {
+                return true;
+            }
+
+            // Desktop: only useful if Windows notifications are enabled
+            return Settings.NotificationOutputMode == NotificationOutputMode.WindowsOnly
+                || Settings.NotificationOutputMode == NotificationOutputMode.PlayniteAndWindows;
+        }
+
+
+        public void StartTimer()
+        {
+            // Run only when needed (Fullscreen OR Desktop with Windows notifications)
+            if (!ShouldRunTimer())
             {
                 StopTimer();
                 return;
             }
+
 
             var interval = TimeSpan.FromSeconds(FixedRefreshSeconds);
 
@@ -183,7 +202,7 @@ namespace SteamFriendsFullscreen
             _ = RefreshSteamPresenceAsync();
         }
 
-        private void StopTimer()
+        public void StopTimer()
         {
             if (refreshTimer == null)
             {
@@ -201,11 +220,18 @@ namespace SteamFriendsFullscreen
             finally
             {
                 refreshTimer = null;
+                hasBaseline = false;
             }
         }
 
         private void ShowToast(string message, string avatar)
         {
+            // In-theme toast only makes sense in Fullscreen
+            if (!IsFullscreenMode())
+            {
+                return;
+            }
+
             toastCts?.Cancel();
             toastCts = new CancellationTokenSource();
             var ct = toastCts.Token;
@@ -260,30 +286,93 @@ namespace SteamFriendsFullscreen
                     return;
                 }
 
-                // Build a localized test message using the same keys as production
                 var friendName = "FriendName";
-                var stateLoc = LocalizeState("online");
 
+                var stateLocTheme = LocalizeStateTheme("online");
+                var stateLocWin = LocalizeStatePlugin("online");
+
+                // Playnite toast (thème)
                 var tpl = GetStringSafe("LOCSteamFriendsToast_Online", "{0} is now {1}");
-                var msg = string.Format(tpl, friendName, stateLoc);
+                var playniteMsg = string.Format(tpl, friendName, stateLocTheme);
 
-                var title = friendName;
+                // Windows toast (plugin)
+                var tplWin = GetStringSafe("LOCSteamFriendsToast_OnlineShort", "is now {0}");
+                var windowsMsg = string.Format(tplWin, stateLocWin);
 
                 if (sendPlaynite)
                 {
-                    ShowToast(msg, null);
+                    ShowToast(playniteMsg, null);
                 }
 
                 if (sendWindows)
                 {
-                    windowsToasts?.Show(title, msg, null);
+                    windowsToasts?.EnsureInitialized();
+                    windowsToasts?.Show(friendName, windowsMsg, null);
                 }
+
+
+
             }
             catch (Exception ex)
             {
                 logger.Warn(ex, "Debug test notification failed.");
             }
         }
+
+
+        public void SetSteamStatus(string status)
+        {
+            try
+            {
+                if (Settings == null)
+                {
+                    return;
+                }
+
+                var uri = $"steam://friends/status/{status}";
+
+                logger.Info($"[SteamFriendsFullscreen] SetSteamStatus: {status} -> {uri}");
+
+                // Debug visible (tu pourras l'enlever après)
+                // PlayniteApi.Dialogs.ShowMessage($"Trying: {uri}");
+
+                // 1) Essai standard (UseShellExecute)
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = uri,
+                        UseShellExecute = true
+                    });
+                }
+                catch (Exception ex1)
+                {
+                    logger.Warn(ex1, "[SteamFriendsFullscreen] Process.Start(shell) failed, trying cmd start...");
+                    // 2) Fallback cmd /c start (marche même quand ShellExecute boude)
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "cmd.exe",
+                        Arguments = $"/c start \"\" \"{uri}\"",
+                        CreateNoWindow = true,
+                        UseShellExecute = false
+                    });
+                }
+
+                // Feedback UI immédiat (optionnel)
+                InvokeOnUi(() =>
+                {
+                    var localState = status == "invisible" ? "offline" : status;
+                    Settings.SelfState = localState;
+                    Settings.SelfStateLoc = LocalizeStateTheme(localState);
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Failed to change Steam status.");
+                PlayniteApi.Dialogs.ShowErrorMessage("Failed to change Steam status.", "Steam Friends Fullscreen");
+            }
+        }
+
 
 
 
@@ -352,6 +441,7 @@ namespace SteamFriendsFullscreen
 
                 bool shouldToast = false;
                 string message = null;
+                string windowsMessage = null;
 
                 // 1) Notify on connect
                 if (wantConnect)
@@ -359,8 +449,14 @@ namespace SteamFriendsFullscreen
                     if (oldState == "offline" && newState != "offline")
                     {
                         shouldToast = true;
+
                         var tpl = GetStringSafe("LOCSteamFriendsToast_Online", "{0} is now {1}");
                         message = string.Format(tpl, f.name ?? "Friend", f.stateLoc ?? newState);
+
+                        // Windows short (no name)
+                        var tplWin = GetStringSafe("LOCSteamFriendsToast_OnlineShort", "is now {0}");
+                        var stateWin = LocalizeStatePlugin(newState);
+                        windowsMessage = string.Format(tplWin, stateWin);
                     }
                 }
 
@@ -373,6 +469,8 @@ namespace SteamFriendsFullscreen
                     if (becameInGame || startedGame)
                     {
                         shouldToast = true;
+
+                        // Playnite message (can include the name)
                         if (!string.IsNullOrWhiteSpace(newGame))
                         {
                             var tpl = GetStringSafe("LOCSteamFriendsToast_GameStart", "{0} started playing {1}");
@@ -380,9 +478,20 @@ namespace SteamFriendsFullscreen
                         }
                         else
                         {
-                            // fallback if Steam doesn't return the game name
                             var tpl = GetStringSafe("LOCSteamFriendsToast_GameStart", "{0} started playing {1}");
-                            message = string.Format(tpl, f.name ?? "Friend", GetStringSafe("LOCSteamInGame", "In game"));
+                            message = string.Format(tpl, f.name ?? "Friend", LocalizeStateTheme("ingame"));
+                        }
+
+                        // Windows short (no name)
+                        if (!string.IsNullOrWhiteSpace(newGame))
+                        {
+                            var tplWin = GetStringSafe("LOCSteamFriendsToast_GameStartShort", "started playing {0}");
+                            windowsMessage = string.Format(tplWin, newGame);
+                        }
+                        else
+                        {
+                            var tplWin = GetStringSafe("LOCSteamFriendsToast_GameStartShort", "started playing {0}");
+                            windowsMessage = string.Format(tplWin, LocalizeStatePlugin("ingame"));
                         }
 
                     }
@@ -399,6 +508,7 @@ namespace SteamFriendsFullscreen
                     }
 
                     lastToastUtc[f.steamid] = now;
+
                     if (sendPlaynite)
                     {
                         ShowToast(message, f.avatar);
@@ -406,15 +516,16 @@ namespace SteamFriendsFullscreen
 
                     if (sendWindows)
                     {
-                        // Titre court + message : Windows aime la sobriété
                         var title = f.name ?? "Friend";
-                        windowsToasts.Show(title, message, f.avatar);
+                        var body = windowsMessage ?? message; // safety fallback
+
+                        windowsToasts?.EnsureInitialized();
+                        windowsToasts?.Show(title, body, f.avatar);
                     }
 
                     lastState[f.steamid] = newState;
                     lastGame[f.steamid] = newGame;
                     break;
-
                 }
 
                 // Update snapshot
@@ -422,6 +533,7 @@ namespace SteamFriendsFullscreen
                 lastGame[f.steamid] = newGame;
             }
         }
+
 
         private void UpdateBaseline(List<FriendPresenceDto> dtos, string selfSteamId64)
         {
@@ -550,11 +662,12 @@ namespace SteamFriendsFullscreen
             {
                 return;
             }
-            // Fullscreen only
-            if (!IsFullscreenMode())
+            // Only refresh when needed (Fullscreen OR Desktop with Windows notifications)
+            if (!ShouldRunTimer())
             {
                 return;
             }
+
 
             // Pause after launching a game
             if (DateTime.UtcNow < pausedUntilUtc)
@@ -660,7 +773,7 @@ namespace SteamFriendsFullscreen
                     {
                         name = p.PersonaName,
                         state = rawState,
-                        stateLoc = LocalizeState(rawState),
+                        stateLoc = LocalizeStateTheme(rawState),
                         game = string.IsNullOrWhiteSpace(p.GameExtraInfo) ? null : p.GameExtraInfo,
                         steamid = p.SteamId
                     };
@@ -719,7 +832,7 @@ namespace SteamFriendsFullscreen
                     {
                         Settings.SelfName = self.PersonaName;
                         Settings.SelfState = myState;
-                        Settings.SelfStateLoc = LocalizeState(myState);
+                        Settings.SelfStateLoc = LocalizeStateTheme(myState);
                         Settings.SelfGame = string.IsNullOrWhiteSpace(self.GameExtraInfo) ? null : self.GameExtraInfo;
                         Settings.SelfAvatar = myAvatar;
                     });
@@ -732,7 +845,7 @@ namespace SteamFriendsFullscreen
                     {
                         Settings.SelfName = null;
                         Settings.SelfState = "offline";
-                        Settings.SelfStateLoc = LocalizeState("offline");
+                        Settings.SelfStateLoc = LocalizeStateTheme("offline");
                         Settings.SelfGame = null;
                         Settings.SelfAvatar = null;
                     });
@@ -1067,6 +1180,9 @@ namespace SteamFriendsFullscreen
             }
         }
 
+      
+
+
         private string GetStringSafe(string key, string fallback)
         {
             try
@@ -1084,7 +1200,23 @@ namespace SteamFriendsFullscreen
             }
         }
 
-        private string LocalizeState(string state)
+        // Theme-driven localization (keys provided by the fullscreen theme)
+        private string LocalizeStateTheme(string state)
+        {
+            switch (state)
+            {
+                case "online": return GetStringSafe("LOCSteamOnline", "Online");
+                case "ingame": return GetStringSafe("LOCSteamInGame", "In game");
+                case "away": return GetStringSafe("LOCSteamAway", "Away");
+                case "busy": return GetStringSafe("LOCSteamBusy", "Busy");
+                case "snooze": return GetStringSafe("LOCSteamSnooze", "Snooze");
+                case "offline": return GetStringSafe("LOCSteamOffline", "Offline");
+                default: return GetStringSafe("LOCSteamOffline", "Offline");
+            }
+        }
+
+        // Plugin-driven localization (ships in Localization/*.xaml)
+        private string LocalizeStatePlugin(string state)
         {
             switch (state)
             {
@@ -1093,23 +1225,26 @@ namespace SteamFriendsFullscreen
                 case "away": return GetStringSafe("LOCSteamFriends_StateAway", "Away");
                 case "busy": return GetStringSafe("LOCSteamFriends_StateBusy", "Busy");
                 case "offline": return GetStringSafe("LOCSteamFriends_StateOffline", "Offline");
-                case "snooze": return GetStringSafe("LOCSteamFriends_StateAway", "Away");
+                case "snooze": return GetStringSafe("LOCSteamFriends_StateSnooze", "Snooze");
                 default: return GetStringSafe("LOCSteamFriends_StateOffline", "Offline");
             }
         }
 
 
 
+
+
         public override void OnGameStarted(OnGameStartedEventArgs args)
         {
-            if (!IsFullscreenMode())
+            // Pause refresh even in Desktop if timer is running (Windows notifications)
+            if (!ShouldRunTimer())
             {
                 return;
             }
 
-            // 10-minute break (avoid refreshing during launch/game)
             pausedUntilUtc = DateTime.UtcNow.Add(PauseOnGameStart);
         }
+
 
 
         public override void OnGameStopped(OnGameStoppedEventArgs args)
@@ -1117,10 +1252,8 @@ namespace SteamFriendsFullscreen
             pausedUntilUtc = DateTime.MinValue;
             hasBaseline = false;
 
-            if (IsFullscreenMode())
-            {
-                StartTimer(); 
-            }
+            StartTimer();
+
         }
 
 

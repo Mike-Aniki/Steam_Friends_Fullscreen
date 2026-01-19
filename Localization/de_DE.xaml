@@ -1,0 +1,68 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" 
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" 
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- Header -->
+    <sys:String x:Key="LOCSteamFriends_Title">Steam Friends Fullscreen</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Subtitle">
+        Zobrazuje stav vašich Steam přátel v celoobrazovkovém režimu Playnite (téma musí plugin podporovat).
+    </sys:String>
+
+    <!-- Setup -->
+    <sys:String x:Key="LOCSteamFriends_Setup">Nastavení</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiKey">Steam Web API klíč</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Profile">Váš Steam profil (odkaz nebo ID)</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ProfileHelp">
+        Vložte odkaz na svůj Steam profil, například: https://steamcommunity.com/id/YourName nebo https://steamcommunity.com/profiles/76561...
+    </sys:String>
+
+    <!-- Display -->
+    <sys:String x:Key="LOCSteamFriends_Display">Zobrazení</sys:String>
+    <sys:String x:Key="LOCSteamFriends_OnlineInfo">
+        Plugin zobrazuje až 15 přátel online současně. Přátelé jsou řazeni podle stavu: ve hře, online, pryč, zaneprázdněn.
+    </sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_ShowOffline">Zobrazit offline přátele</sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_OfflineInfo">
+        Offline přátelé jsou volitelní a omezeni na 40 položek pro zajištění plynulého výkonu.
+    </sys:String>
+
+    <!-- Status -->
+    <sys:String x:Key="LOCSteamFriends_Status">Stav</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Plugin">Plugin:</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Updated">Aktualizováno:</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Error">Chyba:</sys:String>
+
+    <!-- Notifications -->
+    <sys:String x:Key="LOCSteamFriends_Notifications">Oznámení</sys:String>
+    <sys:String x:Key="LOCSteamFriends_EnableNotifications">Povolit oznámení</sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyOnGameStart">Upozornit, když přítel spustí hru (výchozí)</sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyOnConnect">Upozornit, když se přítel přihlásí</sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_NotificationMode">Režim oznámení</sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_NotifyOff">Vypnuto</sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyPlayniteOnly">Playnite (pouze celoobrazovkový režim)</sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyWindowsOnly">Oznámení Windows</sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyBoth">Playnite + Windows</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestNotification">Otestovat oznámení Windows</sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_NotificationsHelp">
+        Zvolte, kde a jak se mají oznámení zobrazovat.
+Oznámení Playnite se zobrazují pouze v celoobrazovkovém tématu.
+Oznámení Windows používají systémové centrum oznámení a fungují v režimu plochy nebo během hraní, pokud je Playnite spuštěn.
+    </sys:String>
+
+    <!-- Toasts -->
+    <sys:String x:Key="LOCSteamFriendsToast_OnlineShort">je nyní {0}</sys:String>
+    <sys:String x:Key="LOCSteamFriendsToast_GameStartShort">začal hrát {0}</sys:String>
+
+    <!-- States -->
+    <sys:String x:Key="LOCSteamFriends_StateOnline">online</sys:String>
+    <sys:String x:Key="LOCSteamFriends_StateInGame">ve hře</sys:String>
+    <sys:String x:Key="LOCSteamFriends_StateAway">pryč</sys:String>
+    <sys:String x:Key="LOCSteamFriends_StateBusy">zaneprázdněn</sys:String>
+    <sys:String x:Key="LOCSteamFriends_StateOffline">offline</sys:String>
+
+</ResourceDictionary>
