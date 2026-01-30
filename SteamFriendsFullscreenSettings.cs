@@ -4,6 +4,13 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
+using System.Diagnostics;
+using System.Threading.Tasks;
+using Microsoft.Win32;
+using System.IO;
+using System.Text.RegularExpressions;
+
+
 
 
 namespace SteamFriendsFullscreen
@@ -202,6 +209,35 @@ namespace SteamFriendsFullscreen
         [DontSerialize]
         public string PluginStatus => "OK";
 
+        // ===== Steam client (runtime) =====
+        private bool isSteamRunning;
+
+        [DontSerialize]
+        public bool IsSteamRunning
+        {
+            get => isSteamRunning;
+            set => SetValue(ref isSteamRunning, value);
+        }
+
+        // ===== Steam launching (runtime) =====
+        private bool isSteamLaunching;
+        private string steamLaunchMessage;
+
+        [DontSerialize]
+        public bool IsSteamLaunching
+        {
+            get => isSteamLaunching;
+            set => SetValue(ref isSteamLaunching, value);
+        }
+
+        [DontSerialize]
+        public string SteamLaunchMessage
+        {
+            get => steamLaunchMessage;
+            set => SetValue(ref steamLaunchMessage, value);
+        }
+
+
         // ===== Self (my profile) runtime =====
         private string selfName = null;
         private string selfState = "offline";
@@ -253,6 +289,7 @@ namespace SteamFriendsFullscreen
         [DontSerialize] public ICommand SetStatusBusyCommand { get; set; }
         [DontSerialize] public ICommand SetStatusInvisibleCommand { get; set; }
         [DontSerialize] public ICommand SetStatusOfflineCommand { get; set; }
+        [DontSerialize] public ICommand OpenSteamCommand { get; set; }
 
     }
 
@@ -324,9 +361,185 @@ namespace SteamFriendsFullscreen
             Settings.SetStatusBusyCommand = new SimpleCommand(() => plugin.SetSteamStatus("busy"));
             Settings.SetStatusInvisibleCommand = new SimpleCommand(() => plugin.SetSteamStatus("invisible"));
             Settings.SetStatusOfflineCommand = new SimpleCommand(() => plugin.SetSteamStatus("offline"));
+            Settings.OpenSteamCommand = new SimpleCommand(() =>
+            {
+                // Anti double-clic
+                if (Settings.IsSteamLaunching)
+                {
+                    return;
+                }
+
+                try
+                {
+                    // UI: on affiche "Launching..."
+                    Settings.IsSteamLaunching = true;
+                    Settings.SteamLaunchMessage = plugin.PlayniteApi?.Resources?.GetString("LOCSteamLaunching") ?? "Launching Steam...";
+
+                    // Lancer Steam
+                    var exe = GetSteamExe();
+                    var canUseExe = !string.IsNullOrWhiteSpace(exe) && File.Exists(exe);
+
+                    if (canUseExe)
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = exe,
+                            Arguments = "-silent",
+                            UseShellExecute = true,
+                            WorkingDirectory = Path.GetDirectoryName(exe)
+                        });
+                    }
+                    else
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "steam://open/main",
+                            UseShellExecute = true
+                        });
+                    }
+
+                    // Attendre un peu, puis refresh pendant ~10s max
+                    Task.Run(async () =>
+                    {
+                        // délai minimum obligatoire (Steam UI réelle)
+                        await Task.Delay(7000).ConfigureAwait(false);
+
+                        // puis on vérifie pendant encore 15s max
+                        for (int i = 0; i < 30; i++)
+                        {
+                            await Task.Delay(500).ConfigureAwait(false);
+
+                            plugin.ForceRefresh();
+
+                            if (plugin?.Settings?.IsSteamRunning == true)
+                            {
+                                System.Windows.Application.Current?.Dispatcher?.BeginInvoke(new Action(() =>
+                                {
+                                    Settings.IsSteamLaunching = false;
+                                    Settings.SteamLaunchMessage = null;
+                                }));
+
+                                plugin.ForceRefresh();
+                                return;
+                            }
+                        }
+
+                        // timeout
+                        System.Windows.Application.Current?.Dispatcher?.BeginInvoke(new Action(() =>
+                        {
+                            Settings.IsSteamLaunching = false;
+                            Settings.SteamLaunchMessage = plugin.PlayniteApi?.Resources?.GetString("LOCSteamLaunchFailed")
+                                                          ?? "Steam did not start. Please run Steam manually.";
+                        }));
+                    });
+
+                }
+                catch (Exception ex)
+                {
+                    System.Windows.Application.Current?.Dispatcher?.BeginInvoke(new Action(() =>
+                    {
+                        Settings.IsSteamLaunching = false;
+                        Settings.SteamLaunchMessage = null;
+                    }));
+
+                    plugin?.PlayniteApi?.Dialogs?.ShowMessage(ex.Message);
+                }
+
+            });
 
 
         }
+
+        private static string GetSteamExe()
+        {
+            string Normalize(string s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim().Trim('"');
+
+            // 1) HKCU Steam
+            try
+            {
+                using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam"))
+                {
+                    var steamExe = Normalize(key?.GetValue("SteamExe") as string);
+                    if (!string.IsNullOrWhiteSpace(steamExe))
+                        return steamExe;
+
+                    var steamPath = Normalize(key?.GetValue("SteamPath") as string);
+                    if (!string.IsNullOrWhiteSpace(steamPath))
+                        return Path.Combine(steamPath, "steam.exe");
+                }
+            }
+            catch { }
+
+            // 2) HKLM Steam (64-bit)
+            try
+            {
+                using (var key = Registry.LocalMachine.OpenSubKey(@"Software\Valve\Steam"))
+                {
+                    var installPath = Normalize(key?.GetValue("InstallPath") as string);
+                    if (!string.IsNullOrWhiteSpace(installPath))
+                        return Path.Combine(installPath, "steam.exe");
+                }
+            }
+            catch { }
+
+            // 3) HKLM Steam (32-bit node)
+            try
+            {
+                using (var key = Registry.LocalMachine.OpenSubKey(@"Software\WOW6432Node\Valve\Steam"))
+                {
+                    var installPath = Normalize(key?.GetValue("InstallPath") as string);
+                    if (!string.IsNullOrWhiteSpace(installPath))
+                        return Path.Combine(installPath, "steam.exe");
+                }
+            }
+            catch { }
+
+            // 4) Protocol handler command (often contains full path to steam.exe)
+            // Examples: "C:\Program Files (x86)\Steam\Steam.exe" "%1"
+            string cmd = null;
+
+            try
+            {
+                using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Classes\steam\Shell\Open\Command"))
+                {
+                    cmd = Normalize(key?.GetValue(null) as string);
+                }
+            }
+            catch { }
+
+            if (string.IsNullOrWhiteSpace(cmd))
+            {
+                try
+                {
+                    using (var key = Registry.ClassesRoot.OpenSubKey(@"steam\Shell\Open\Command"))
+                    {
+                        cmd = Normalize(key?.GetValue(null) as string);
+                    }
+                }
+                catch { }
+            }
+
+            if (!string.IsNullOrWhiteSpace(cmd))
+            {
+                // extract first quoted path ending with steam.exe
+                var m = Regex.Match(cmd, "\"(?<p>[^\\\"]+steam\\.exe)\"", RegexOptions.IgnoreCase);
+                if (m.Success)
+                {
+                    return Normalize(m.Groups["p"].Value);
+                }
+
+                // or unquoted path up to steam.exe
+                m = Regex.Match(cmd, @"(?<p>[A-Z]:\\[^\""]+steam\.exe)", RegexOptions.IgnoreCase);
+                if (m.Success)
+                {
+                    return Normalize(m.Groups["p"].Value);
+                }
+            }
+
+            return null;
+        }
+
+
 
         public void BeginEdit()
         {

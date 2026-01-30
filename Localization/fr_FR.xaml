@@ -4,19 +4,27 @@
 
     <!-- Header -->
     <sys:String x:Key="LOCSteamFriends_Title">Steam Friends Fullscreen</sys:String>
-    <sys:String x:Key="LOCSteamFriends_Subtitle">Affiche le statut de tes amis Steam dans Playnite Fullscreen (le thème doit supporter le plugin).</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Subtitle">
+        Affiche le statut de vos amis Steam dans Playnite Fullscreen (le thème doit prendre en charge le plugin).
+    </sys:String>
 
     <!-- Setup -->
     <sys:String x:Key="LOCSteamFriends_Setup">Configuration</sys:String>
     <sys:String x:Key="LOCSteamFriends_ApiKey">Clé Steam Web API</sys:String>
-    <sys:String x:Key="LOCSteamFriends_Profile">Ton profil Steam (lien ou ID)</sys:String>
-    <sys:String x:Key="LOCSteamFriends_ProfileHelp">Colle le lien de ton profil Steam : https://steamcommunity.com/id/TonNom OU https://steamcommunity.com/profiles/76561...</sys:String>
+    <sys:String x:Key="LOCSteamFriends_Profile">Votre profil Steam (lien ou ID)</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ProfileHelp">
+        Collez le lien de votre profil Steam : https://steamcommunity.com/id/VotreNom OU https://steamcommunity.com/profiles/76561...
+    </sys:String>
 
     <!-- Display -->
     <sys:String x:Key="LOCSteamFriends_Display">Affichage</sys:String>
-    <sys:String x:Key="LOCSteamFriends_OnlineInfo">Le plugin affiche jusqu’à 15 amis en ligne simultanément. Priorité : en jeu, puis en ligne, absent, occupé.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_OnlineInfo">
+        Le plugin affiche jusqu’à 15 amis en ligne simultanément. Priorité : en jeu, puis en ligne, absent, occupé.
+    </sys:String>
     <sys:String x:Key="LOCSteamFriends_ShowOffline">Afficher les amis hors ligne</sys:String>
-    <sys:String x:Key="LOCSteamFriends_OfflineInfo">Les amis hors ligne sont optionnels et limités à 40 simultanément pour garantir de bonnes performances.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_OfflineInfo">
+        Les amis hors ligne sont optionnels et limités à 40 simultanément afin de garantir de bonnes performances.
+    </sys:String>
 
     <!-- Status -->
     <sys:String x:Key="LOCSteamFriends_Status">Statut</sys:String>
@@ -26,8 +34,12 @@
 
     <sys:String x:Key="LOCSteamFriends_Notifications">Notifications</sys:String>
     <sys:String x:Key="LOCSteamFriends_EnableNotifications">Activer les notifications</sys:String>
-    <sys:String x:Key="LOCSteamFriends_NotifyOnGameStart">Notifier quand un ami lance un jeu (par défaut)</sys:String>
-    <sys:String x:Key="LOCSteamFriends_NotifyOnConnect">Notifier quand un ami se connecte</sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyOnGameStart">
+        Notifier lorsqu’un ami lance un jeu (par défaut)
+    </sys:String>
+    <sys:String x:Key="LOCSteamFriends_NotifyOnConnect">
+        Notifier lorsqu’un ami se connecte
+    </sys:String>
 
     <sys:String x:Key="LOCSteamFriends_NotificationMode">Mode de notification</sys:String>
 
@@ -35,15 +47,15 @@
     <sys:String x:Key="LOCSteamFriends_NotifyPlayniteOnly">Playnite (Fullscreen uniquement)</sys:String>
     <sys:String x:Key="LOCSteamFriends_NotifyWindowsOnly">Notifications Windows</sys:String>
     <sys:String x:Key="LOCSteamFriends_NotifyBoth">Playnite + Windows</sys:String>
-    <sys:String x:Key="LOCSteamFriends_TestNotification">Tester notification Windows</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestNotification">
+        Tester la notification Windows
+    </sys:String>
 
     <sys:String x:Key="LOCSteamFriends_NotificationsHelp">
         Choisissez où et comment les notifications sont affichées.
 Les notifications Playnite apparaissent uniquement dans le thème Fullscreen.
 Les notifications Windows utilisent le centre de notifications du système et peuvent s’afficher en mode Bureau ou pendant un jeu, tant que Playnite est en cours d’exécution.
     </sys:String>
-
-
 
     <sys:String x:Key="LOCSteamFriendsToast_OnlineShort">est maintenant {0}</sys:String>
     <sys:String x:Key="LOCSteamFriendsToast_GameStartShort">a commencé à jouer à {0}</sys:String>
@@ -53,5 +65,9 @@ Les notifications Windows utilisent le centre de notifications du système et pe
     <sys:String x:Key="LOCSteamFriends_StateAway">Absent</sys:String>
     <sys:String x:Key="LOCSteamFriends_StateBusy">Occupé</sys:String>
     <sys:String x:Key="LOCSteamFriends_StateOffline">Hors ligne</sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_PrivacyNotice">
+        IMPORTANT : votre profil Steam et votre liste d’amis doivent être définis comme Publics, sinon l’API Steam ne renverra aucune donnée et le plugin affichera données obsolètes.
+    </sys:String>
 
 </ResourceDictionary>

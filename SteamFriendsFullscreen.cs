@@ -169,6 +169,19 @@ namespace SteamFriendsFullscreen
                 || Settings.NotificationOutputMode == NotificationOutputMode.PlayniteAndWindows;
         }
 
+        private bool IsSteamClientRunning()
+        {
+            try
+            {
+                // Steam client process
+                return Process.GetProcessesByName("steam").Any();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
 
         public void StartTimer()
         {
@@ -223,6 +236,18 @@ namespace SteamFriendsFullscreen
                 hasBaseline = false;
             }
         }
+
+        public void ForceRefresh()
+        {
+            // If timer isn't supposed to run in current mode, don't force refresh
+            if (!ShouldRunTimer())
+            {
+                return;
+            }
+
+            _ = RefreshSteamPresenceAsync();
+        }
+
 
         private void ShowToast(string message, string avatar)
         {
@@ -328,6 +353,17 @@ namespace SteamFriendsFullscreen
                 {
                     return;
                 }
+
+                // Steam client required to change status
+                if (!IsSteamClientRunning())
+                {
+                    InvokeOnUi(() =>
+                    {
+                        Settings.IsSteamRunning = false;
+                    });
+                    return;
+                }
+
 
                 var uri = $"steam://friends/status/{status}";
 
@@ -679,6 +715,11 @@ namespace SteamFriendsFullscreen
             {
                 return;
             }
+
+            // Update Steam running state for theme bindings
+            var steamRunning = IsSteamClientRunning();
+            InvokeOnUi(() => Settings.IsSteamRunning = steamRunning);
+
 
             var apiKey = Settings.SteamApiKey?.Trim();
             var steamIdInput = Settings.SteamId64?.Trim();

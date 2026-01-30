@@ -65,4 +65,9 @@ As notificações do Windows usam o centro de notificações do sistema e funcio
     <sys:String x:Key="LOCSteamFriends_StateBusy">ocupado</sys:String>
     <sys:String x:Key="LOCSteamFriends_StateOffline">offline</sys:String>
 
+    <sys:String x:Key="LOCSteamFriends_PrivacyNotice">
+        IMPORTANTE: Seu perfil do Steam e sua lista de amigos devem estar definidos como Públicos, caso contrário a Steam Web API não retornará nenhum dado e o plugin exibirá desatualizado.
+    </sys:String>
+
+
 </ResourceDictionary>

@@ -65,4 +65,9 @@
     <sys:String x:Key="LOCSteamFriends_StateBusy">занят</sys:String>
     <sys:String x:Key="LOCSteamFriends_StateOffline">не в сети</sys:String>
 
+    <sys:String x:Key="LOCSteamFriends_PrivacyNotice">
+        ВАЖНО: Ваш профиль Steam и список друзей должны быть установлены как Публичные, иначе Steam Web API не вернёт данные, и плагин покажет устаревшие данные.
+    </sys:String>
+
+
 </ResourceDictionary>
