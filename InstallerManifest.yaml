@@ -41,3 +41,10 @@ Packages:
     Changelog:
       - Added an explanatory note stating that the Steam profile must be set to Public for the plugin to work properly.
       - Fix English localization issue.
+  - Version: 1.6
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2026-01-30
+    PackageUrl: https://github.com/Mike-Aniki/Steam_Friends_Fullscreen/releases/download/v1.6/SteamFriendsFullscreen_d8d67c7e-a797-45d7-ae44-3d53ddecc8d1_1_6.pext
+    Changelog:
+      - Added a feature to launch the Steam client automatically when it is not running.
+      - Added a binding to hide the status buttons when Steam is not running.
