@@ -150,7 +150,78 @@ Themes can let users **change their Steam status directly**.
 - Updates `SelfState` and `SelfStateLoc`
 - Syncs UI on next refresh
 
-Steam must be running.
+**_Steam must be running._**
+
+## Steam client state & launch control
+
+The plugin exposes the current Steam client state and a command to start Steam directly from a Fullscreen theme.
+
+This allows themes to adapt their UI depending on whether Steam is running.
+
+### Runtime property
+
+| Property | Type | Description |
+|----------|------|-------------|
+| IsSteamRunning | bool | Indicates whether the Steam client is currently running |
+
+Themes can use this property to:
+- Hide Steam status buttons when Steam is not running
+- Show a dedicated **Start Steam** button instead
+- Disable Steam-related UI when unavailable
+
+**Launch Steam command**
+
+| Command | Description |
+|--------|-------------|
+| LaunchSteamCommand | Launches the Steam client if it is not running |
+
+### Example
+
+```xaml
+<!-- Steam status buttons -->
+<StackPanel>
+    <StackPanel.Style>
+        <Style TargetType="StackPanel">
+            <Setter Property="Visibility" Value="Visible"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{PluginSettings Plugin=SteamFriendsFullscreen, Path=IsSteamRunning}"
+                             Value="False">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </StackPanel.Style>
+
+    <!-- Status buttons here -->
+</StackPanel>
+
+<!-- Start Steam button -->
+<Button Content="Start Steam"
+        Command="{PluginSettings Plugin=SteamFriendsFullscreen, Path=LaunchSteamCommand}">
+    <Button.Style>
+        <Style TargetType="Button">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{PluginSettings Plugin=SteamFriendsFullscreen, Path=IsSteamRunning}"
+                             Value="False">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Button.Style>
+</Button>
+```
+
+**Recommended UX pattern**
+
+When IsSteamRunning = true
+- show Steam status controls (Online / Away / Invisible / etc.)
+
+When IsSteamRunning = false
+- hide status controls
+- show a single Start Steam button
+
+This avoids presenting inactive Steam actions when the client is not running.
 
 ## Toast notifications (Fullscreen themes)
 
