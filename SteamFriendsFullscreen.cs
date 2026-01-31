@@ -67,7 +67,6 @@ namespace SteamFriendsFullscreen
 
         // Anti-stutter UI
         private string lastUiSignature = null;
-        private string lastSelfState = null;
 
         // Cache avatars local
         private string avatarCacheDir;
@@ -247,6 +246,31 @@ namespace SteamFriendsFullscreen
 
             _ = RefreshSteamPresenceAsync();
         }
+
+        public async Task ForceRefreshAndWaitAsync(int timeoutMs = 10000)
+        {
+            if (!ShouldRunTimer())
+            {
+                return;
+            }
+
+            // Attendre si un refresh est déjà en cours
+            var waited = 0;
+            while (isRefreshing && waited < timeoutMs)
+            {
+                await Task.Delay(200).ConfigureAwait(false);
+                waited += 200;
+            }
+
+            // Lancer un refresh et attendre qu'il ait fini
+            await RefreshSteamPresenceAsync().ConfigureAwait(false);
+        }
+
+        public bool IsSteamRunningNow()
+        {
+            return IsSteamClientRunning();
+        }
+
 
 
         private void ShowToast(string message, string avatar)
@@ -742,7 +766,6 @@ namespace SteamFriendsFullscreen
                 });
 
                 lastUiSignature = null;
-                lastSelfState = null;
                 return;
             }
 
@@ -862,35 +885,43 @@ namespace SteamFriendsFullscreen
                         _ = CacheAvatarAsync(steamId64, self.AvatarFull);
                     }
 
-                    // ✅ Update stateLoc ONLY if state changed
-                    var stateChanged = !string.Equals(lastSelfState, myState, StringComparison.Ordinal);
-                    if (stateChanged)
-                    {
-                        lastSelfState = myState;
-                    }
-
                     InvokeOnUi(() =>
                     {
                         Settings.SelfName = self.PersonaName;
-                        Settings.SelfState = myState;
-                        Settings.SelfStateLoc = LocalizeStateTheme(myState);
-                        Settings.SelfGame = string.IsNullOrWhiteSpace(self.GameExtraInfo) ? null : self.GameExtraInfo;
                         Settings.SelfAvatar = myAvatar;
+
+                        if (!steamRunning)
+                        {
+                            Settings.SelfState = "notrunning";
+                            Settings.SelfStateLoc = GetStringSafe("LOCSteamNotRunning", "Steam not running");
+                            Settings.SelfGame = null;
+                        }
+                        else
+                        {
+                            Settings.SelfState = myState;
+                            Settings.SelfStateLoc = LocalizeStateTheme(myState);
+                            Settings.SelfGame = string.IsNullOrWhiteSpace(self.GameExtraInfo) ? null : self.GameExtraInfo;
+                        }
                     });
                 }
                 else
                 {
-                    lastSelfState = "offline";
-
+                    // Si l’API ne renvoie rien, on garde un fallback simple
                     InvokeOnUi(() =>
                     {
                         Settings.SelfName = null;
-                        Settings.SelfState = "offline";
-                        Settings.SelfStateLoc = LocalizeStateTheme("offline");
-                        Settings.SelfGame = null;
                         Settings.SelfAvatar = null;
+
+                        Settings.SelfState = !steamRunning ? "notrunning" : "offline";
+                        Settings.SelfStateLoc = !steamRunning
+                            ? GetStringSafe("LOCSteamNotRunning", "Steam not running")
+                            : LocalizeStateTheme("offline");
+
+                        Settings.SelfGame = null;
                     });
                 }
+
+
 
 
 
@@ -1221,7 +1252,7 @@ namespace SteamFriendsFullscreen
             }
         }
 
-      
+
 
 
         private string GetStringSafe(string key, string fallback)
@@ -1229,10 +1260,15 @@ namespace SteamFriendsFullscreen
             try
             {
                 var s = PlayniteApi?.Resources?.GetString(key);
-                if (string.IsNullOrWhiteSpace(s) || s == key)
+
+                // Playnite renvoie "<!KEY!>" quand la clé n'existe pas
+                if (string.IsNullOrWhiteSpace(s) ||
+                    s == key ||
+                    (s.StartsWith("<!", StringComparison.Ordinal) && s.EndsWith("!>", StringComparison.Ordinal)))
                 {
                     return fallback;
                 }
+
                 return s;
             }
             catch
@@ -1240,6 +1276,7 @@ namespace SteamFriendsFullscreen
                 return fallback;
             }
         }
+
 
         // Theme-driven localization (keys provided by the fullscreen theme)
         private string LocalizeStateTheme(string state)

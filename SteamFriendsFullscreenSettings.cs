@@ -399,39 +399,63 @@ namespace SteamFriendsFullscreen
                     }
 
                     // Attendre un peu, puis refresh pendant ~10s max
+                    // Attendre un peu, puis refresh jusqu'à ce que l'API reflète le vrai statut
                     Task.Run(async () =>
                     {
-                        // délai minimum obligatoire (Steam UI réelle)
+                        // délai minimum (UI Steam)
                         await Task.Delay(7000).ConfigureAwait(false);
 
-                        // puis on vérifie pendant encore 15s max
+                        // 1) Attendre que steam.exe soit réellement lancé (max ~15s)
+                        var steamDetected = false;
                         for (int i = 0; i < 30; i++)
                         {
-                            await Task.Delay(500).ConfigureAwait(false);
-
-                            plugin.ForceRefresh();
-
-                            if (plugin?.Settings?.IsSteamRunning == true)
+                            if (plugin.IsSteamRunningNow())
                             {
-                                System.Windows.Application.Current?.Dispatcher?.BeginInvoke(new Action(() =>
-                                {
-                                    Settings.IsSteamLaunching = false;
-                                    Settings.SteamLaunchMessage = null;
-                                }));
-
-                                plugin.ForceRefresh();
-                                return;
+                                steamDetected = true;
+                                break;
                             }
+
+                            await Task.Delay(500).ConfigureAwait(false);
                         }
 
-                        // timeout
+                        if (!steamDetected)
+                        {
+                            // Steam pas détecté
+                            System.Windows.Application.Current?.Dispatcher?.BeginInvoke(new Action(() =>
+                            {
+                                Settings.IsSteamLaunching = false;
+                                Settings.SteamLaunchMessage = plugin.PlayniteApi?.Resources?.GetString("LOCSteamLaunchFailed")
+                                                              ?? "Steam did not start. Please run Steam manually.";
+                            }));
+                            return;
+                        }
+
+                        // Steam détecté → on cache "Launching..."
                         System.Windows.Application.Current?.Dispatcher?.BeginInvoke(new Action(() =>
                         {
                             Settings.IsSteamLaunching = false;
-                            Settings.SteamLaunchMessage = plugin.PlayniteApi?.Resources?.GetString("LOCSteamLaunchFailed")
-                                                          ?? "Steam did not start. Please run Steam manually.";
+                            Settings.SteamLaunchMessage = null;
                         }));
+
+                        // 2) Maintenant le vrai fix :
+                        // On force plusieurs refresh rapprochés jusqu'à ce que SelfState ne soit plus offline (max ~20s)
+                        for (int i = 0; i < 20; i++)
+                        {
+                            await plugin.ForceRefreshAndWaitAsync().ConfigureAwait(false);
+
+                            // Si l'API a enfin mis à jour ton statut
+                            var state = plugin?.Settings?.SelfState;
+                            if (!string.IsNullOrWhiteSpace(state) && !state.Equals("notrunning", StringComparison.OrdinalIgnoreCase))
+                            {
+                                return;
+                            }
+
+                            await Task.Delay(1000).ConfigureAwait(false);
+                        }
+
+                        // Si après ~20s c'est toujours offline, on laisse le timer normal faire le prochain refresh
                     });
+
 
                 }
                 catch (Exception ex)
