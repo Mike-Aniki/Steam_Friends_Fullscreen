@@ -21,7 +21,7 @@ namespace SteamFriendsFullscreen
             };
         }
 
-        public async Task<List<string>> GetFriendSteamIdsAsync(string apiKey, string steamId64)
+        public async Task<List<SteamFriend>> GetFriendsAsync(string apiKey, string steamId64)
         {
             var url =
                 $"https://api.steampowered.com/ISteamUser/GetFriendList/v1/?key={Uri.EscapeDataString(apiKey)}&steamid={Uri.EscapeDataString(steamId64)}&relationship=friend";
@@ -31,11 +31,100 @@ namespace SteamFriendsFullscreen
 
             return root?.FriendsList?.Friends?
                 .Where(f => string.Equals(f.Relationship, "friend", StringComparison.OrdinalIgnoreCase))
+                .Where(f => !string.IsNullOrWhiteSpace(f.SteamId))
+                .GroupBy(f => f.SteamId)
+                .Select(g => g.First())
+                .ToList()
+                ?? new List<SteamFriend>();
+        }
+
+        public async Task<List<string>> GetFriendSteamIdsAsync(string apiKey, string steamId64)
+        {
+            var friends = await GetFriendsAsync(apiKey, steamId64).ConfigureAwait(false);
+
+            return friends
                 .Select(f => f.SteamId)
                 .Where(id => !string.IsNullOrWhiteSpace(id))
                 .Distinct()
-                .ToList()
-                ?? new List<string>();
+                .ToList();
+        }
+
+        public async Task<List<SteamRecentlyPlayedGame>> GetRecentlyPlayedGamesAsync(string apiKey, string steamId64, int count = 3)
+        {
+            try
+            {
+                var safeCount = Math.Max(1, count);
+
+                var url =
+                    $"https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/?key={Uri.EscapeDataString(apiKey)}&steamid={Uri.EscapeDataString(steamId64)}&count={safeCount}";
+
+                var json = await http.GetStringAsync(url).ConfigureAwait(false);
+                var root = Serialization.FromJson<GetRecentlyPlayedGamesResponseRoot>(json);
+
+                return root?.Response?.Games ?? new List<SteamRecentlyPlayedGame>();
+            }
+            catch (Exception ex)
+            {
+                logger.Warn(ex, $"GetRecentlyPlayedGames failed for '{steamId64}'.");
+                return new List<SteamRecentlyPlayedGame>();
+            }
+        }
+
+        public async Task<List<SteamRecentlyPlayedGame>> GetAllRecentlyPlayedGamesAsync(string apiKey, string steamId64)
+        {
+            try
+            {
+                var url =
+                    $"https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/?key={Uri.EscapeDataString(apiKey)}&steamid={Uri.EscapeDataString(steamId64)}&count=0";
+
+                var json = await http.GetStringAsync(url).ConfigureAwait(false);
+                var root = Serialization.FromJson<GetRecentlyPlayedGamesResponseRoot>(json);
+
+                return root?.Response?.Games ?? new List<SteamRecentlyPlayedGame>();
+            }
+            catch (Exception ex)
+            {
+                logger.Warn(ex, $"GetAllRecentlyPlayedGames failed for '{steamId64}'.");
+                return new List<SteamRecentlyPlayedGame>();
+            }
+        }
+
+        public async Task<int> GetSteamLevelAsync(string apiKey, string steamId64)
+        {
+            try
+            {
+                var url =
+                    $"https://api.steampowered.com/IPlayerService/GetSteamLevel/v1/?key={Uri.EscapeDataString(apiKey)}&steamid={Uri.EscapeDataString(steamId64)}";
+
+                var json = await http.GetStringAsync(url).ConfigureAwait(false);
+                var root = Serialization.FromJson<GetSteamLevelResponseRoot>(json);
+
+                return root?.Response?.PlayerLevel ?? 0;
+            }
+            catch (Exception ex)
+            {
+                logger.Warn(ex, $"GetSteamLevel failed for '{steamId64}'.");
+                return 0;
+            }
+        }
+
+        public async Task<List<SteamBadge>> GetBadgesAsync(string apiKey, string steamId64)
+        {
+            try
+            {
+                var url =
+                    $"https://api.steampowered.com/IPlayerService/GetBadges/v1/?key={Uri.EscapeDataString(apiKey)}&steamid={Uri.EscapeDataString(steamId64)}";
+
+                var json = await http.GetStringAsync(url).ConfigureAwait(false);
+                var root = Serialization.FromJson<GetBadgesResponseRoot>(json);
+
+                return root?.Response?.Badges ?? new List<SteamBadge>();
+            }
+            catch (Exception ex)
+            {
+                logger.Warn(ex, $"GetBadges failed for '{steamId64}'.");
+                return new List<SteamBadge>();
+            }
         }
 
         public async Task<List<SteamPlayerSummary>> GetPlayerSummariesAsync(string apiKey, IEnumerable<string> steamIds)

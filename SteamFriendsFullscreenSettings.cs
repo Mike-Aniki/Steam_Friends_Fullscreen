@@ -283,6 +283,48 @@ namespace SteamFriendsFullscreen
         [DontSerialize]
         public Action DebugTestNotification { get; set; }
 
+        // ===== Selected friend profile (runtime) =====
+        private FriendProfileDto selectedFriendProfile;
+        private bool isFriendProfileLoading;
+        private string selectedFriendSteamId;
+        private string friendProfileError;
+        private bool isFriendProfileOpen;
+
+        [DontSerialize]
+        public bool IsFriendProfileOpen
+        {
+            get => isFriendProfileOpen;
+            set => SetValue(ref isFriendProfileOpen, value);
+        }
+
+        [DontSerialize]
+        public FriendProfileDto SelectedFriendProfile
+        {
+            get => selectedFriendProfile;
+            set => SetValue(ref selectedFriendProfile, value);
+        }
+
+        [DontSerialize]
+        public bool IsFriendProfileLoading
+        {
+            get => isFriendProfileLoading;
+            set => SetValue(ref isFriendProfileLoading, value);
+        }
+
+        [DontSerialize]
+        public string SelectedFriendSteamId
+        {
+            get => selectedFriendSteamId;
+            set => SetValue(ref selectedFriendSteamId, value);
+        }
+
+        [DontSerialize]
+        public string FriendProfileError
+        {
+            get => friendProfileError;
+            set => SetValue(ref friendProfileError, value);
+        }
+
         // ===== Commands (runtime) =====
         [DontSerialize] public ICommand SetStatusOnlineCommand { get; set; }
         [DontSerialize] public ICommand SetStatusAwayCommand { get; set; }
@@ -290,6 +332,10 @@ namespace SteamFriendsFullscreen
         [DontSerialize] public ICommand SetStatusInvisibleCommand { get; set; }
         [DontSerialize] public ICommand SetStatusOfflineCommand { get; set; }
         [DontSerialize] public ICommand OpenSteamCommand { get; set; }
+
+        [DontSerialize] public ICommand OpenFriendProfileCommand { get; set; }
+        [DontSerialize] public ICommand RefreshSelectedFriendProfileCommand { get; set; }
+        [DontSerialize] public ICommand ClearFriendProfileCommand { get; set; }
 
     }
 
@@ -469,6 +515,35 @@ namespace SteamFriendsFullscreen
                     plugin?.PlayniteApi?.Dialogs?.ShowMessage(ex.Message);
                 }
 
+            });
+            Settings.OpenFriendProfileCommand = new SimpleParameterCommand(parameter =>
+            {
+                var steamId = parameter as string;
+                if (string.IsNullOrWhiteSpace(steamId))
+                {
+                    return;
+                }
+
+                Settings.IsFriendProfileOpen = true;
+                _ = plugin.OpenFriendProfileAsync(steamId);
+            });
+
+            Settings.RefreshSelectedFriendProfileCommand = new SimpleCommand(() =>
+            {
+                if (string.IsNullOrWhiteSpace(Settings.SelectedFriendSteamId))
+                {
+                    return;
+                }
+
+                _ = plugin.OpenFriendProfileAsync(Settings.SelectedFriendSteamId, true);
+            });
+
+            Settings.ClearFriendProfileCommand = new SimpleCommand(() =>
+            {
+                Settings.IsFriendProfileOpen = false;
+                Settings.SelectedFriendSteamId = null;
+                Settings.SelectedFriendProfile = null;
+                Settings.FriendProfileError = null;
             });
 
 

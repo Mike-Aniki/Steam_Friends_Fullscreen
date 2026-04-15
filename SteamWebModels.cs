@@ -38,6 +38,15 @@ namespace SteamFriendsFullscreen
         [SerializationPropertyName("personastate")]
         public int PersonaState { get; set; }
 
+        [SerializationPropertyName("communityvisibilitystate")]
+        public int CommunityVisibilityState { get; set; }
+
+        [SerializationPropertyName("lastlogoff")]
+        public long LastLogOff { get; set; }
+
+        [SerializationPropertyName("profileurl")]
+        public string ProfileUrl { get; set; }
+
         [SerializationPropertyName("gameextrainfo")]
         public string GameExtraInfo { get; set; }
 

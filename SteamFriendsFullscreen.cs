@@ -68,8 +68,19 @@ namespace SteamFriendsFullscreen
         // Anti-stutter UI
         private string lastUiSignature = null;
 
+        // ===== Friend profile cache =====
+        private FriendProfileCacheStore friendProfileCache;
+        private readonly TimeSpan friendProfileCacheTtl = TimeSpan.FromHours(24);
+
+        // Extended friends cache (to keep friend_since)
+        private System.Collections.Generic.List<SteamFriend> cachedFriendsExtended = null;
+        private DateTime cachedFriendsExtendedLastFetchUtc = DateTime.MinValue;
+        private readonly TimeSpan cachedFriendsExtendedTtl = TimeSpan.FromHours(6);
+
+        // Cache avatars local
         // Cache avatars local
         private string avatarCacheDir;
+        private string gameHeaderCacheDir;
 
         private readonly HttpClient http = new HttpClient
         {
@@ -78,6 +89,9 @@ namespace SteamFriendsFullscreen
 
         private readonly SemaphoreSlim avatarDlSem = new SemaphoreSlim(2, 2);
         private readonly ConcurrentDictionary<string, byte> avatarDlInProgress = new ConcurrentDictionary<string, byte>();
+
+        private readonly SemaphoreSlim gameHeaderDlSem = new SemaphoreSlim(2, 2);
+        private readonly ConcurrentDictionary<int, byte> gameHeaderDlInProgress = new ConcurrentDictionary<int, byte>();
 
         // Avatar download limit per refresh
         private const int MaxAvatarDownloadsPerRefresh = 4;
@@ -102,7 +116,11 @@ namespace SteamFriendsFullscreen
             windowsToasts = new WindowsToastService();
 
             avatarCacheDir = Path.Combine(GetPluginUserDataPath(), "AvatarCache");
+            gameHeaderCacheDir = Path.Combine(GetPluginUserDataPath(), "GameHeaderCache");
+            friendProfileCache = new FriendProfileCacheStore(GetPluginUserDataPath());
+
             Directory.CreateDirectory(avatarCacheDir);
+            Directory.CreateDirectory(gameHeaderCacheDir);
 
             AddSettingsSupportSafe("SteamFriendsFullscreen", "Settings");
 
@@ -714,6 +732,254 @@ namespace SteamFriendsFullscreen
             }
         }
 
+        private async Task<System.Collections.Generic.List<SteamFriend>> GetExtendedFriendsAsync(string apiKey, string steamId64)
+        {
+            var nowUtc = DateTime.UtcNow;
+
+            var canUseCache =
+                cachedFriendsExtended != null &&
+                cachedFriendsExtended.Count > 0 &&
+                (nowUtc - cachedFriendsExtendedLastFetchUtc) < cachedFriendsExtendedTtl;
+
+            if (canUseCache)
+            {
+                return cachedFriendsExtended;
+            }
+
+            var friends = await steamClient.GetFriendsAsync(apiKey, steamId64).ConfigureAwait(false);
+            cachedFriendsExtended = friends ?? new System.Collections.Generic.List<SteamFriend>();
+            cachedFriendsExtendedLastFetchUtc = nowUtc;
+
+            return cachedFriendsExtended;
+        }
+
+        private string FormatMinutesToHours(int minutes)
+        {
+            if (minutes <= 0)
+            {
+                return "0 h";
+            }
+
+            var hours = minutes / 60;
+            var remainingMinutes = minutes % 60;
+
+            if (hours <= 0)
+            {
+                return $"{remainingMinutes} min";
+            }
+
+            if (remainingMinutes <= 0)
+            {
+                return $"{hours} h";
+            }
+
+            return $"{hours} h {remainingMinutes:00}";
+        }
+
+        private DateTime? UnixToUtc(long unixSeconds)
+        {
+            if (unixSeconds <= 0)
+            {
+                return null;
+            }
+
+            try
+            {
+                return DateTimeOffset.FromUnixTimeSeconds(unixSeconds).UtcDateTime;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public async Task OpenFriendProfileAsync(string friendSteamId, bool forceRefresh = false)
+        {
+            if (Settings == null || string.IsNullOrWhiteSpace(friendSteamId))
+            {
+                return;
+            }
+
+            var apiKey = Settings.SteamApiKey?.Trim();
+            var steamIdInput = Settings.SteamId64?.Trim();
+            var selfSteamId64 = await ResolveSteamId64Async(apiKey, steamIdInput).ConfigureAwait(false);
+
+            if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(selfSteamId64))
+            {
+                InvokeOnUi(() =>
+                {
+                    Settings.IsFriendProfileOpen = true;
+                    Settings.SelectedFriendSteamId = friendSteamId;
+                    Settings.SelectedFriendProfile = null;
+                    Settings.FriendProfileError = "Missing API key or Steam profile.";
+                    Settings.IsFriendProfileLoading = false;
+                });
+                return;
+            }
+
+            InvokeOnUi(() =>
+            {
+                Settings.IsFriendProfileOpen = true;
+                Settings.SelectedFriendSteamId = friendSteamId;
+                Settings.FriendProfileError = null;
+                Settings.IsFriendProfileLoading = true;
+            });
+
+            try
+            {
+                if (!forceRefresh)
+                {
+                    var cached = friendProfileCache.TryLoad(friendSteamId);
+                    if (cached?.profile != null && (DateTime.UtcNow - cached.cachedAtUtc) <= friendProfileCacheTtl)
+                    {
+                        if (cached.profile.recentGames != null)
+                        {
+                            foreach (var game in cached.profile.recentGames)
+                            {
+                                if (string.IsNullOrWhiteSpace(game.playtimeForeverDisplay))
+                                {
+                                    game.playtimeForeverDisplay = FormatMinutesToHours(game.playtimeForeverMinutes);
+                                }
+
+                                if (string.IsNullOrWhiteSpace(game.playtime2WeeksDisplay))
+                                {
+                                    game.playtime2WeeksDisplay = FormatMinutesToHours(game.playtime2WeeksMinutes);
+                                }
+
+                                if (string.IsNullOrWhiteSpace(game.headerImageUrl))
+                                {
+                                    game.headerImageUrl = GetGameHeaderSource(game.appid);
+                                }
+                                else if (!game.headerImageUrl.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    game.headerImageUrl = GetGameHeaderSource(game.appid);
+                                }
+                            }
+                        }
+
+                        if (cached.profile.recentPlaytime2WeeksMinutes <= 0 && cached.profile.recentGames != null)
+                        {
+                            cached.profile.recentPlaytime2WeeksMinutes = cached.profile.recentGames.Sum(g => g.playtime2WeeksMinutes);
+                        }
+
+                        if (string.IsNullOrWhiteSpace(cached.profile.recentPlaytime2WeeksDisplay))
+                        {
+                            cached.profile.recentPlaytime2WeeksDisplay = FormatMinutesToHours(cached.profile.recentPlaytime2WeeksMinutes);
+                        }
+                        InvokeOnUi(() =>
+                        {
+                            if (Settings.SelectedFriendSteamId == friendSteamId)
+                            {
+                                Settings.SelectedFriendProfile = cached.profile;
+                                Settings.FriendProfileError = null;
+                            }
+
+                            Settings.IsFriendProfileLoading = false;
+                        });
+
+                        return;
+                    }
+                }
+
+                var summaryTask = steamClient.GetPlayerSummariesAsync(apiKey, new[] { friendSteamId });
+                var allRecentGamesTask = steamClient.GetAllRecentlyPlayedGamesAsync(apiKey, friendSteamId);
+                var friendsTask = GetExtendedFriendsAsync(apiKey, selfSteamId64);
+                var steamLevelTask = steamClient.GetSteamLevelAsync(apiKey, friendSteamId);
+                var badgesTask = steamClient.GetBadgesAsync(apiKey, friendSteamId);
+
+                await Task.WhenAll(summaryTask, allRecentGamesTask, friendsTask, steamLevelTask, badgesTask).ConfigureAwait(false);
+
+                var summary = summaryTask.Result?.FirstOrDefault();
+                if (summary == null)
+                {
+                    throw new Exception("Friend summary not returned by Steam.");
+                }
+
+                var allRecentGames = allRecentGamesTask.Result ?? new System.Collections.Generic.List<SteamRecentlyPlayedGame>();
+                var topRecentGames = allRecentGames.Take(5).ToList();
+                var recent2WeeksTotalMinutes = allRecentGames.Sum(g => g.Playtime2Weeks);
+                var badges = badgesTask.Result ?? new System.Collections.Generic.List<SteamBadge>();
+                var steamFriend = friendsTask.Result?.FirstOrDefault(f => f?.SteamId == friendSteamId);
+
+                string avatar = null;
+                var localPath = GetAvatarFilePath(friendSteamId);
+                if (!string.IsNullOrWhiteSpace(localPath) && File.Exists(localPath))
+                {
+                    avatar = ToFileUri(localPath);
+                }
+                else
+                {
+                    avatar = summary.AvatarFull;
+                    _ = CacheAvatarAsync(friendSteamId, summary.AvatarFull);
+                }
+
+                var rawState = MapState(summary);
+
+                var profile = new FriendProfileDto
+                {
+                    steamid = friendSteamId,
+                    name = summary.PersonaName,
+                    avatar = avatar,
+                    state = rawState,
+                    stateLoc = LocalizeStateTheme(rawState),
+                    game = string.IsNullOrWhiteSpace(summary.GameExtraInfo) ? null : summary.GameExtraInfo,
+                    isProfilePublic = summary.CommunityVisibilityState == 3,
+                    lastLogoffUtc = UnixToUtc(summary.LastLogOff),
+                    friendSinceUtc = steamFriend != null ? UnixToUtc(steamFriend.FriendSince) : null,
+
+                    steamLevel = steamLevelTask.Result,
+                    badgesCount = badges.Count,
+                    recentPlaytime2WeeksMinutes = recent2WeeksTotalMinutes,
+                    recentPlaytime2WeeksDisplay = FormatMinutesToHours(recent2WeeksTotalMinutes),
+
+                    recentGames = topRecentGames
+                        .Select(g => new RecentGameDto
+                        {
+                            appid = g.AppId,
+                            name = g.Name,
+                            playtime2WeeksMinutes = g.Playtime2Weeks,
+                            playtimeForeverMinutes = g.PlaytimeForever,
+                            playtime2WeeksDisplay = FormatMinutesToHours(g.Playtime2Weeks),
+                            playtimeForeverDisplay = FormatMinutesToHours(g.PlaytimeForever),
+                            headerImageUrl = GetGameHeaderSource(g.AppId)
+                        })
+                        .ToList()
+                };
+
+                friendProfileCache.Save(new CachedFriendProfile
+                {
+                    steamid = friendSteamId,
+                    cachedAtUtc = DateTime.UtcNow,
+                    profile = profile
+                });
+
+                InvokeOnUi(() =>
+                {
+                    if (Settings.SelectedFriendSteamId == friendSteamId)
+                    {
+                        Settings.SelectedFriendProfile = profile;
+                        Settings.FriendProfileError = null;
+                    }
+
+                    Settings.IsFriendProfileLoading = false;
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, $"Failed to open friend profile for '{friendSteamId}'.");
+
+                InvokeOnUi(() =>
+                {
+                    if (Settings.SelectedFriendSteamId == friendSteamId)
+                    {
+                        Settings.SelectedFriendProfile = null;
+                        Settings.FriendProfileError = "Failed to load friend profile.";
+                    }
+
+                    Settings.IsFriendProfileLoading = false;
+                });
+            }
+        }
 
         // Main refresh
         private async Task RefreshSteamPresenceAsync()
@@ -1083,6 +1349,98 @@ namespace SteamFriendsFullscreen
         }
 
         //  Avatar cache 
+        private string GetSteamHeaderImageUrl(int appId)
+        {
+            if (appId <= 0)
+            {
+                return null;
+            }
+
+            return $"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{appId}/header.jpg";
+        }
+
+        private string GetGameHeaderFilePath(int appId)
+        {
+            if (appId <= 0)
+            {
+                return null;
+            }
+
+            return Path.Combine(gameHeaderCacheDir, appId + ".jpg");
+        }
+
+        private string GetGameHeaderSource(int appId)
+        {
+            if (appId <= 0)
+            {
+                return null;
+            }
+
+            var localPath = GetGameHeaderFilePath(appId);
+            if (!string.IsNullOrWhiteSpace(localPath) && File.Exists(localPath))
+            {
+                return ToFileUri(localPath);
+            }
+
+            var url = GetSteamHeaderImageUrl(appId);
+            _ = CacheGameHeaderAsync(appId, url);
+            return url;
+        }
+
+        private async Task CacheGameHeaderAsync(int appId, string imageUrl)
+        {
+            if (appId <= 0 || string.IsNullOrWhiteSpace(imageUrl))
+            {
+                return;
+            }
+
+            var path = GetGameHeaderFilePath(appId);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            if (File.Exists(path))
+            {
+                return;
+            }
+
+            if (!gameHeaderDlInProgress.TryAdd(appId, 0))
+            {
+                return;
+            }
+
+            try
+            {
+                await gameHeaderDlSem.WaitAsync().ConfigureAwait(false);
+
+                if (File.Exists(path))
+                {
+                    return;
+                }
+
+                var data = await http.GetByteArrayAsync(imageUrl).ConfigureAwait(false);
+
+                var tmp = path + ".tmp";
+                File.WriteAllBytes(tmp, data);
+
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+
+                File.Move(tmp, path);
+            }
+            catch
+            {
+            }
+            finally
+            {
+                gameHeaderDlSem.Release();
+                gameHeaderDlInProgress.TryRemove(appId, out _);
+            }
+        }
+
         private string GetAvatarFilePath(string steamId)
         {
             if (string.IsNullOrWhiteSpace(steamId))
