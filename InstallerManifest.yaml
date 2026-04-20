@@ -55,4 +55,13 @@ Packages:
     Changelog:
       - Added a new Steam not running state to clearly distinguish when Steam is closed.
       - When clicking Open Steam, the plugin now waits for Steam to actually start and refreshes until the real Steam status is detected.
-
+  - Version: 1.8
+    RequiredApiVersion: 6.12.0
+    ReleaseDate: 2026-04-20
+    PackageUrl: https://github.com/Mike-Aniki/Steam_Friends_Fullscreen/releases/download/v1.8/SteamFriendsFullscreen_d8d67c7e-a797-45d7-ae44-3d53ddecc8d1_1_8.pext
+    Changelog:
+      - Added support for detailed friend profiles in fullscreen themes.
+      - Recent games with Steam header images via PluginSettings.
+      - Steam level, badge count, and 2-week playtime via PluginSettings.
+      - Local caching for profile data and game images.
+      - Recent games use Steam 2-week playtime data.
