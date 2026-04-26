@@ -65,3 +65,10 @@ Packages:
       - Steam level, badge count, and 2-week playtime via PluginSettings.
       - Local caching for profile data and game images.
       - Recent games use Steam 2-week playtime data.
+  - Version: 1.8.1
+    RequiredApiVersion: 6.16.0
+    ReleaseDate: 2026-04-26
+    PackageUrl: https://github.com/Mike-Aniki/Steam_Friends_Fullscreen/releases/download/v1.8.1/SteamFriendsFullscreen_d8d67c7e-a797-45d7-ae44-3d53ddecc8d1_1_8_1.pext
+    Changelog:
+      - Added a child window feature for the Profile view.
+      - Updated the Playnite SDK; the latest version of Playnite is now required.
