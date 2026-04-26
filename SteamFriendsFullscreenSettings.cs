@@ -334,6 +334,7 @@ namespace SteamFriendsFullscreen
         [DontSerialize] public ICommand OpenSteamCommand { get; set; }
 
         [DontSerialize] public ICommand OpenFriendProfileCommand { get; set; }
+        [DontSerialize] public ICommand OpenFriendProfileWindowCommand { get; set; }
         [DontSerialize] public ICommand RefreshSelectedFriendProfileCommand { get; set; }
         [DontSerialize] public ICommand ClearFriendProfileCommand { get; set; }
 
@@ -526,6 +527,20 @@ namespace SteamFriendsFullscreen
 
                 Settings.IsFriendProfileOpen = true;
                 _ = plugin.OpenFriendProfileAsync(steamId);
+            });
+
+            Settings.OpenFriendProfileWindowCommand = new SimpleParameterCommand(parameter =>
+            {
+                var steamId = parameter as string;
+                if (string.IsNullOrWhiteSpace(steamId))
+                {
+                    return;
+                }
+
+                Settings.IsFriendProfileOpen = true;
+                _ = plugin.OpenFriendProfileAsync(steamId);
+
+                plugin.OpenFriendProfileWindow();
             });
 
             Settings.RefreshSelectedFriendProfileCommand = new SimpleCommand(() =>

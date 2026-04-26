@@ -36,6 +36,7 @@ namespace SteamFriendsFullscreen
         public string recentPlaytime2WeeksDisplay { get; set; }
 
         public List<RecentGameDto> recentGames { get; set; } = new List<RecentGameDto>();
+        public List<RecentFriendAchievementDto> recentAchievements { get; set; } = new List<RecentFriendAchievementDto>();
     }
 
     public class CachedFriendProfile

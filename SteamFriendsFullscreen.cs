@@ -15,6 +15,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
+using System.Windows.Input;
 
 namespace SteamFriendsFullscreen
 {
@@ -32,6 +34,7 @@ namespace SteamFriendsFullscreen
         private DateTime lastSuccessUtc = DateTime.MinValue;
 
         private SteamWebApiClient steamClient;
+        private Window friendProfileWindow;
         private WindowsToastService windowsToasts;
 
         private const int FixedRefreshSeconds = 60;
@@ -93,6 +96,19 @@ namespace SteamFriendsFullscreen
         private readonly SemaphoreSlim gameHeaderDlSem = new SemaphoreSlim(2, 2);
         private readonly ConcurrentDictionary<int, byte> gameHeaderDlInProgress = new ConcurrentDictionary<int, byte>();
 
+        // ===== Friends Achievement Feed cache =====
+        private static readonly Guid friendsAchievementFeedPluginId =
+            Guid.Parse("10f90193-72aa-4cdb-b16d-3e6b1f0feb17");
+
+        private const string friendsAchievementFeedCacheFileName = "friend_achievement_cache.json";
+        private const int MaxRecentFriendAchievements = 2;
+
+        private string FriendsAchievementFeedCachePath => Path.Combine(
+            PlayniteApi.Paths.ExtensionsDataPath,
+            friendsAchievementFeedPluginId.ToString(),
+            friendsAchievementFeedCacheFileName
+        );
+
         // Avatar download limit per refresh
         private const int MaxAvatarDownloadsPerRefresh = 4;
 
@@ -144,9 +160,89 @@ namespace SteamFriendsFullscreen
             }
         }
 
+        public void OpenFriendProfileWindow()
+        {
+            Application.Current?.Dispatcher?.Invoke(() =>
+            {
+                if (friendProfileWindow != null && friendProfileWindow.IsVisible)
+                {
+                    friendProfileWindow.Activate();
+                    friendProfileWindow.Focus();
+                    return;
+                }
+
+                var window = PlayniteApi.Dialogs.CreateWindow(new WindowCreationOptions
+                {
+                    ShowMinimizeButton = false
+                });
+
+                var style = Application.Current.TryFindResource("FriendsStyleProfil") as Style;
+                if (style != null)
+                {
+                    window.Style = style;
+                }
+
+                window.WindowStyle = WindowStyle.None;
+                window.ResizeMode = ResizeMode.NoResize;
+                window.WindowState = WindowState.Maximized;
+                window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                window.Owner = PlayniteApi.Dialogs.GetCurrentAppWindow();
+
+                window.PreviewKeyDown += (s, e) =>
+                {
+                    if (e.Key == Key.Escape)
+                    {
+                        e.Handled = true;
+                        CloseFriendProfileWindow();
+                    }
+                };
+
+                window.Closed += (s, e) =>
+                {
+                    friendProfileWindow = null;
+                    Settings.IsFriendProfileOpen = false;
+                };
+
+                friendProfileWindow = window;
+
+                window.Show();
+                window.Activate();
+                window.Focus();
+            });
+        }
+
+        public bool CloseFriendProfileWindow()
+        {
+            if (friendProfileWindow == null || !friendProfileWindow.IsVisible)
+            {
+                return false;
+            }
+
+            friendProfileWindow.Close();
+            friendProfileWindow = null;
+
+            return true;
+        }
+
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
             StartTimer();
+        }
+
+        public override void OnControllerButtonStateChanged(OnControllerButtonStateChangedArgs args)
+        {
+            if (args.Button == ControllerInput.B && args.State == ControllerInputState.Pressed)
+            {
+                if (friendProfileWindow != null && friendProfileWindow.IsVisible && friendProfileWindow.IsActive)
+                {
+                    if (CloseFriendProfileWindow())
+                    {
+                        return;
+                    }
+                }
+            }
+
+            base.OnControllerButtonStateChanged(args);
         }
 
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
@@ -753,6 +849,54 @@ namespace SteamFriendsFullscreen
             return cachedFriendsExtended;
         }
 
+        private static readonly Regex fafMsJsonDateRegex =
+    new Regex(@"\/Date\((\-?\d+)(?:[+-]\d+)?\)\/", RegexOptions.Compiled);
+
+        private DateTime? ParseFafMsJsonDateToUtc(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            try
+            {
+                var match = fafMsJsonDateRegex.Match(value);
+                if (!match.Success)
+                {
+                    return null;
+                }
+
+                if (!long.TryParse(match.Groups[1].Value, out var ms))
+                {
+                    return null;
+                }
+
+                return DateTimeOffset.FromUnixTimeMilliseconds(ms).UtcDateTime;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private string FormatDateTimeForFriendAchievement(DateTime? utcDate)
+        {
+            if (!utcDate.HasValue)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                return utcDate.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
         private string FormatMinutesToHours(int minutes)
         {
             if (minutes <= 0)
@@ -790,6 +934,78 @@ namespace SteamFriendsFullscreen
             catch
             {
                 return null;
+            }
+        }
+
+        private List<RecentFriendAchievementDto> LoadRecentFriendAchievements(string friendSteamId, int maxItems = MaxRecentFriendAchievements)
+        {
+            var result = new List<RecentFriendAchievementDto>();
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(friendSteamId))
+                {
+                    return result;
+                }
+
+                if (!File.Exists(FriendsAchievementFeedCachePath))
+                {
+                    return result;
+                }
+
+                string json;
+                using (var fs = new FileStream(FriendsAchievementFeedCachePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var sr = new StreamReader(fs))
+                {
+                    json = sr.ReadToEnd();
+                }
+
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    return result;
+                }
+
+                var cache = Serialization.FromJson<FriendAchievementFeedCache>(json);
+                var entries = cache?.Entries ?? new List<FriendAchievementFeedEntry>();
+
+                result = entries
+                    .Where(e =>
+                        !string.IsNullOrWhiteSpace(e.FriendSteamId) &&
+                        string.Equals(e.FriendSteamId.Trim(), friendSteamId.Trim(), StringComparison.OrdinalIgnoreCase))
+                    .Select(e =>
+                    {
+                        var unlockUtc = ParseFafMsJsonDateToUtc(e.FriendUnlockTimeUtc);
+
+                        var icon = e.FriendAchievementIcon;
+                        if (!string.IsNullOrWhiteSpace(icon) && File.Exists(icon))
+                        {
+                            icon = new Uri(icon).AbsoluteUri;
+                        }
+
+                        return new RecentFriendAchievementDto
+                        {
+                            achievementApiName = e.AchievementApiName,
+                            achievementDisplayName = e.AchievementDisplayName,
+                            achievementDescription = e.AchievementDescription,
+                            appid = e.AppId,
+                            playniteGameId = e.PlayniteGameId,
+                            gameName = e.GameName,
+                            icon = icon,
+                            unlockTimeUtc = unlockUtc,
+                            unlockTimeDisplay = FormatDateTimeForFriendAchievement(unlockUtc),
+                            rarity = null
+                        };
+                    })
+                    .OrderByDescending(x => x.unlockTimeUtc ?? DateTime.MinValue)
+                    .Take(Math.Max(1, maxItems))
+                    .ToList();
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                logger.Warn(ex, $"Failed to load recent friend achievements for '{friendSteamId}'.");
+                return new List<RecentFriendAchievementDto>();
             }
         }
 
@@ -866,6 +1082,9 @@ namespace SteamFriendsFullscreen
                         {
                             cached.profile.recentPlaytime2WeeksDisplay = FormatMinutesToHours(cached.profile.recentPlaytime2WeeksMinutes);
                         }
+
+                        cached.profile.recentAchievements = LoadRecentFriendAchievements(friendSteamId);
+
                         InvokeOnUi(() =>
                         {
                             if (Settings.SelectedFriendSteamId == friendSteamId)
@@ -896,7 +1115,7 @@ namespace SteamFriendsFullscreen
                 }
 
                 var allRecentGames = allRecentGamesTask.Result ?? new System.Collections.Generic.List<SteamRecentlyPlayedGame>();
-                var topRecentGames = allRecentGames.Take(5).ToList();
+                var topRecentGames = allRecentGames.Take(3).ToList();
                 var recent2WeeksTotalMinutes = allRecentGames.Sum(g => g.Playtime2Weeks);
                 var badges = badgesTask.Result ?? new System.Collections.Generic.List<SteamBadge>();
                 var steamFriend = friendsTask.Result?.FirstOrDefault(f => f?.SteamId == friendSteamId);
@@ -943,7 +1162,9 @@ namespace SteamFriendsFullscreen
                             playtimeForeverDisplay = FormatMinutesToHours(g.PlaytimeForever),
                             headerImageUrl = GetGameHeaderSource(g.AppId)
                         })
-                        .ToList()
+                        .ToList(),
+
+                        recentAchievements = LoadRecentFriendAchievements(friendSteamId)
                 };
 
                 friendProfileCache.Save(new CachedFriendProfile
