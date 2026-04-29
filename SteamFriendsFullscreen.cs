@@ -17,6 +17,7 @@ using System.Windows.Threading;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace SteamFriendsFullscreen
 {
@@ -179,14 +180,38 @@ namespace SteamFriendsFullscreen
                 var style = Application.Current.TryFindResource("FriendsStyleProfil") as Style;
                 if (style != null)
                 {
-                    window.Style = style;
+                    window.Content = new Viewbox
+                    {
+                        Stretch = Stretch.Uniform,
+                        Child = new Grid
+                        {
+                            Width = 1920,
+                            Height = 1080,
+                            Children =
+                            {
+                                new ContentControl
+                                {
+                                    Focusable = false,
+                                    Style = style
+                                }
+                            }
+                        }
+                    };
                 }
 
                 window.WindowStyle = WindowStyle.None;
                 window.ResizeMode = ResizeMode.NoResize;
                 window.WindowState = WindowState.Maximized;
                 window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-                window.Owner = PlayniteApi.Dialogs.GetCurrentAppWindow();
+
+                var parent = PlayniteApi.Dialogs.GetCurrentAppWindow();
+                if (parent != null)
+                {
+                    window.Width = parent.Width;
+                    window.Height = parent.Height;
+                }
+
+                window.Owner = parent;
 
                 window.PreviewKeyDown += (s, e) =>
                 {
