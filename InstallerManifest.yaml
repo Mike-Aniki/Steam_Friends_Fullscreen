@@ -72,3 +72,9 @@ Packages:
     Changelog:
       - Added a child window feature for the Profile view.
       - Updated the Playnite SDK; the latest version of Playnite is now required.
+  - Version: 1.8.2
+    RequiredApiVersion: 6.16.0
+    ReleaseDate: 2026-04-29
+    PackageUrl: https://github.com/Mike-Aniki/Steam_Friends_Fullscreen/releases/download/v1.8.2/SteamFriendsFullscreen_d8d67c7e-a797-45d7-ae44-3d53ddecc8d1_1_8_2.pext
+    Changelog:
+      - Fixed friend profile windows appearing too large or cropped on high-DPI displays when Windows scaling is above 100%
