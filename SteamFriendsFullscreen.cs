@@ -35,8 +35,11 @@ namespace SteamFriendsFullscreen
         private DateTime lastSuccessUtc = DateTime.MinValue;
 
         private SteamWebApiClient steamClient;
+        private Window selfStatusWindow;
         private Window friendProfileWindow;
+        private Window friendActionsWindow;
         private WindowsToastService windowsToasts;
+        private DateTime friendActionsOpenedUtc = DateTime.MinValue;
 
         private const int FixedRefreshSeconds = 60;
         private const int FixedMaxFriendsShown = 15;
@@ -236,6 +239,159 @@ namespace SteamFriendsFullscreen
             });
         }
 
+        public void OpenFriendActionsWindow()
+        {
+            Application.Current?.Dispatcher?.Invoke(() =>
+            {
+                if (friendActionsWindow != null && friendActionsWindow.IsVisible)
+                {
+                    friendActionsWindow.Activate();
+                    friendActionsWindow.Focus();
+                    return;
+                }
+
+                Settings.IsFriendActionsMenuOpen = true;
+
+                var window = PlayniteApi.Dialogs.CreateWindow(new WindowCreationOptions
+                {
+                    ShowMinimizeButton = false
+                });
+
+                var style = Application.Current.TryFindResource("FriendsActionStyle") as Style;
+                if (style != null)
+                {
+                    window.Content = new Viewbox
+                    {
+                        Stretch = Stretch.Uniform,
+                        Child = new Grid
+                        {
+                            Width = 1920,
+                            Height = 1080,
+                            Children =
+                    {
+                        new ContentControl
+                        {
+                            Focusable = false,
+                            Style = style
+                        }
+                    }
+                        }
+                    };
+                }
+
+                window.WindowStyle = WindowStyle.None;
+                window.ResizeMode = ResizeMode.NoResize;
+                window.WindowState = WindowState.Maximized;
+                window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+                var parent = PlayniteApi.Dialogs.GetCurrentAppWindow();
+                if (parent != null)
+                {
+                    window.Width = parent.Width;
+                    window.Height = parent.Height;
+                }
+
+                window.Owner = parent;
+
+                window.PreviewKeyDown += (s, e) =>
+                {
+                    if (e.Key == Key.Escape)
+                    {
+                        e.Handled = true;
+                        CloseFriendActionsWindow();
+                    }
+                };
+
+                window.Closed += (s, e) =>
+                {
+                    friendActionsWindow = null;
+                    Settings.IsFriendActionsMenuOpen = false;
+                    Settings.SelectedFriendForActions = null;
+                };
+
+                friendActionsOpenedUtc = DateTime.UtcNow;
+                friendActionsWindow = window;
+
+                window.Show();
+                window.Activate();
+                window.Focus();
+            });
+        }
+
+        public void OpenSelfStatusWindow()
+        {
+            Application.Current?.Dispatcher?.Invoke(() =>
+            {
+                if (selfStatusWindow != null && selfStatusWindow.IsVisible)
+                {
+                    selfStatusWindow.Activate();
+                    selfStatusWindow.Focus();
+                    return;
+                }
+
+                var window = PlayniteApi.Dialogs.CreateWindow(new WindowCreationOptions
+                {
+                    ShowMinimizeButton = false
+                });
+
+                var style = Application.Current.TryFindResource("FriendsSelfStatusStyle") as Style;
+                if (style != null)
+                {
+                    window.Content = new Viewbox
+                    {
+                        Stretch = Stretch.Uniform,
+                        Child = new Grid
+                        {
+                            Width = 1920,
+                            Height = 1080,
+                            Children =
+                    {
+                        new ContentControl
+                        {
+                            Focusable = false,
+                            Style = style
+                        }
+                    }
+                        }
+                    };
+                }
+
+                window.WindowStyle = WindowStyle.None;
+                window.ResizeMode = ResizeMode.NoResize;
+                window.WindowState = WindowState.Maximized;
+                window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+                var parent = PlayniteApi.Dialogs.GetCurrentAppWindow();
+                if (parent != null)
+                {
+                    window.Width = parent.Width;
+                    window.Height = parent.Height;
+                }
+
+                window.Owner = parent;
+
+                window.PreviewKeyDown += (s, e) =>
+                {
+                    if (e.Key == Key.Escape)
+                    {
+                        e.Handled = true;
+                        CloseSelfStatusWindow();
+                    }
+                };
+
+                window.Closed += (s, e) =>
+                {
+                    selfStatusWindow = null;
+                };
+
+                selfStatusWindow = window;
+
+                window.Show();
+                window.Activate();
+                window.Focus();
+            });
+        }
+
         public bool CloseFriendProfileWindow()
         {
             if (friendProfileWindow == null || !friendProfileWindow.IsVisible)
@@ -249,6 +405,37 @@ namespace SteamFriendsFullscreen
             return true;
         }
 
+        public bool CloseFriendActionsWindow()
+        {
+            if (friendActionsWindow == null || !friendActionsWindow.IsVisible)
+            {
+                Settings.IsFriendActionsMenuOpen = false;
+                Settings.SelectedFriendForActions = null;
+                return false;
+            }
+
+            friendActionsWindow.Close();
+            friendActionsWindow = null;
+
+            Settings.IsFriendActionsMenuOpen = false;
+            Settings.SelectedFriendForActions = null;
+
+            return true;
+        }
+
+        public bool CloseSelfStatusWindow()
+        {
+            if (selfStatusWindow == null || !selfStatusWindow.IsVisible)
+            {
+                return false;
+            }
+
+            selfStatusWindow.Close();
+            selfStatusWindow = null;
+
+            return true;
+        }
+
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
             StartTimer();
@@ -256,9 +443,57 @@ namespace SteamFriendsFullscreen
 
         public override void OnControllerButtonStateChanged(OnControllerButtonStateChangedArgs args)
         {
-            if (args.Button == ControllerInput.B && args.State == ControllerInputState.Pressed)
+            if (args.State != ControllerInputState.Pressed)
             {
-                if (friendProfileWindow != null && friendProfileWindow.IsVisible && friendProfileWindow.IsActive)
+                base.OnControllerButtonStateChanged(args);
+                return;
+            }
+
+            // Friend actions child window
+            if (friendActionsWindow != null && friendActionsWindow.IsVisible)
+            {
+                var justOpenedActionsMenu = (DateTime.UtcNow - friendActionsOpenedUtc).TotalMilliseconds < 350;
+
+                if (justOpenedActionsMenu)
+                {
+                    return;
+                }
+
+                if (args.Button == ControllerInput.A)
+                {
+                    Settings.OpenSelectedFriendProfileCommand?.Execute(null);
+                    return;
+                }
+
+                if (args.Button == ControllerInput.X)
+                {
+                    Settings.OpenSelectedFriendChatCommand?.Execute(null);
+                    return;
+                }
+
+                if (args.Button == ControllerInput.B)
+                {
+                    CloseFriendActionsWindow();
+                    return;
+                }
+            }
+
+            // Self status child window
+            if (args.Button == ControllerInput.B)
+            {
+                if (selfStatusWindow != null && selfStatusWindow.IsVisible)
+                {
+                    if (CloseSelfStatusWindow())
+                    {
+                        return;
+                    }
+                }
+            }
+
+            // Friend profile child window
+            if (args.Button == ControllerInput.B)
+            {
+                if (friendProfileWindow != null && friendProfileWindow.IsVisible)
                 {
                     if (CloseFriendProfileWindow())
                     {

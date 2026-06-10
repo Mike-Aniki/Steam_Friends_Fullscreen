@@ -325,6 +325,23 @@ namespace SteamFriendsFullscreen
             set => SetValue(ref friendProfileError, value);
         }
 
+        private bool isFriendActionsMenuOpen;
+        private FriendPresenceDto selectedFriendForActions;
+
+        [DontSerialize]
+        public bool IsFriendActionsMenuOpen
+        {
+            get => isFriendActionsMenuOpen;
+            set => SetValue(ref isFriendActionsMenuOpen, value);
+        }
+
+        [DontSerialize]
+        public FriendPresenceDto SelectedFriendForActions
+        {
+            get => selectedFriendForActions;
+            set => SetValue(ref selectedFriendForActions, value);
+        }
+
         // ===== Commands (runtime) =====
         [DontSerialize] public ICommand SetStatusOnlineCommand { get; set; }
         [DontSerialize] public ICommand SetStatusAwayCommand { get; set; }
@@ -333,11 +350,17 @@ namespace SteamFriendsFullscreen
         [DontSerialize] public ICommand SetStatusOfflineCommand { get; set; }
         [DontSerialize] public ICommand OpenSteamCommand { get; set; }
 
+        [DontSerialize] public ICommand OpenSelfStatusWindowCommand { get; set; }
         [DontSerialize] public ICommand OpenFriendProfileCommand { get; set; }
         [DontSerialize] public ICommand OpenFriendProfileWindowCommand { get; set; }
         [DontSerialize] public ICommand RefreshSelectedFriendProfileCommand { get; set; }
         [DontSerialize] public ICommand ClearFriendProfileCommand { get; set; }
-
+        [DontSerialize] public ICommand OpenFriendChatCommand { get; set; }
+        [DontSerialize] public ICommand OpenFriendActionsWindowCommand { get; set; }
+        [DontSerialize] public ICommand OpenFriendActionsMenuCommand { get; set; }
+        [DontSerialize] public ICommand CloseFriendActionsMenuCommand { get; set; }
+        [DontSerialize] public ICommand OpenSelectedFriendProfileCommand { get; set; }
+        [DontSerialize] public ICommand OpenSelectedFriendChatCommand { get; set; }
     }
 
     public class SteamFriendsFullscreenSettingsViewModel : ObservableObject, ISettings
@@ -517,6 +540,10 @@ namespace SteamFriendsFullscreen
                 }
 
             });
+            Settings.OpenSelfStatusWindowCommand = new SimpleCommand(() =>
+            {
+                plugin.OpenSelfStatusWindow();
+            });
             Settings.OpenFriendProfileCommand = new SimpleParameterCommand(parameter =>
             {
                 var steamId = parameter as string;
@@ -559,6 +586,130 @@ namespace SteamFriendsFullscreen
                 Settings.SelectedFriendSteamId = null;
                 Settings.SelectedFriendProfile = null;
                 Settings.FriendProfileError = null;
+            });
+
+            Settings.OpenFriendChatCommand = new SimpleParameterCommand(parameter =>
+            {
+                var steamId = parameter as string;
+                if (string.IsNullOrWhiteSpace(steamId))
+                {
+                    return;
+                }
+
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = $"steam://friends/message/{steamId}",
+                        UseShellExecute = true
+                    });
+                }
+                catch
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "cmd.exe",
+                            Arguments = $"/c start \"\" \"steam://friends/message/{steamId}\"",
+                            CreateNoWindow = true,
+                            UseShellExecute = false
+                        });
+                    }
+                    catch { }
+                }
+            });
+
+            Settings.OpenFriendActionsMenuCommand = new SimpleParameterCommand(parameter =>
+            {
+                var steamId = parameter as string;
+                if (string.IsNullOrWhiteSpace(steamId))
+                {
+                    return;
+                }
+
+                FriendPresenceDto friend = null;
+
+                foreach (var item in Settings.Friends)
+                {
+                    if (item != null && item.steamid == steamId)
+                    {
+                        friend = item;
+                        break;
+                    }
+                }
+
+                if (friend == null)
+                {
+                    return;
+                }
+
+                Settings.SelectedFriendForActions = friend;
+                Settings.IsFriendActionsMenuOpen = true;
+            });
+
+            Settings.OpenFriendActionsWindowCommand = new SimpleParameterCommand(parameter =>
+            {
+                var steamId = parameter as string;
+                if (string.IsNullOrWhiteSpace(steamId))
+                {
+                    return;
+                }
+
+                FriendPresenceDto friend = null;
+
+                foreach (var item in Settings.Friends)
+                {
+                    if (item != null && item.steamid == steamId)
+                    {
+                        friend = item;
+                        break;
+                    }
+                }
+
+                if (friend == null)
+                {
+                    return;
+                }
+
+                Settings.SelectedFriendForActions = friend;
+                Settings.IsFriendActionsMenuOpen = true;
+
+                plugin.OpenFriendActionsWindow();
+            });
+
+            Settings.CloseFriendActionsMenuCommand = new SimpleCommand(() =>
+            {
+                Settings.IsFriendActionsMenuOpen = false;
+                Settings.SelectedFriendForActions = null;
+            });
+
+            Settings.OpenSelectedFriendProfileCommand = new SimpleCommand(() =>
+            {
+                var steamId = Settings.SelectedFriendForActions?.steamid;
+                if (string.IsNullOrWhiteSpace(steamId))
+                {
+                    return;
+                }
+
+                plugin.CloseFriendActionsWindow();
+
+                Settings.IsFriendProfileOpen = true;
+                _ = plugin.OpenFriendProfileAsync(steamId);
+
+                plugin.OpenFriendProfileWindow();
+            });
+
+            Settings.OpenSelectedFriendChatCommand = new SimpleCommand(() =>
+            {
+                var steamId = Settings.SelectedFriendForActions?.steamid;
+                if (string.IsNullOrWhiteSpace(steamId))
+                {
+                    return;
+                }
+
+                plugin.CloseFriendActionsWindow();
+                Settings.OpenFriendChatCommand?.Execute(steamId);
             });
 
 
