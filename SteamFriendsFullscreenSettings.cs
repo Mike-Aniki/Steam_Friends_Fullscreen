@@ -1,4 +1,4 @@
-﻿using Playnite.SDK;
+using Playnite.SDK;
 using Playnite.SDK.Data;
 using System;
 using System.Collections.Generic;
@@ -51,7 +51,7 @@ namespace SteamFriendsFullscreen
         // Optional: notify when a friend comes online
         private bool notifyOnConnect = false;
 
-        
+
 
         public bool NotifyOnGameStart
         {
@@ -206,8 +206,25 @@ namespace SteamFriendsFullscreen
             set => SetValue(ref offlineCount, value);
         }
 
+        private bool compatibilityDisabledByAnikiHelper;
+        private string compatibilityStatus = "Steam Friends Fullscreen legacy mode active.";
+
         [DontSerialize]
-        public string PluginStatus => "OK";
+        public bool CompatibilityDisabledByAnikiHelper
+        {
+            get => compatibilityDisabledByAnikiHelper;
+            set => SetValue(ref compatibilityDisabledByAnikiHelper, value);
+        }
+
+        [DontSerialize]
+        public string CompatibilityStatus
+        {
+            get => compatibilityStatus;
+            set => SetValue(ref compatibilityStatus, value);
+        }
+
+        [DontSerialize]
+        public string PluginStatus => CompatibilityDisabledByAnikiHelper ? "Disabled by Aniki Helper" : "OK";
 
         // ===== Steam client (runtime) =====
         private bool isSteamRunning;

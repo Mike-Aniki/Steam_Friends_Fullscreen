@@ -1,4 +1,4 @@
-﻿using Playnite.SDK;
+using Playnite.SDK;
 using Playnite.SDK.Data;
 using Playnite.SDK.Events;
 using Playnite.SDK.Plugins;
@@ -104,6 +104,11 @@ namespace SteamFriendsFullscreen
         private static readonly Guid friendsAchievementFeedPluginId =
             Guid.Parse("10f90193-72aa-4cdb-b16d-3e6b1f0feb17");
 
+        // Compatibility guard: Aniki Helper features are enabled by the Aniki theme marker.
+        // Do NOT disable this plugin just because Aniki Helper is installed.
+        // Disable only when the active fullscreen theme exposes the same marker used by Aniki Helper.
+        private const string AnikiThemeMarkerResourceKey = "Aniki_ThemeMarker";
+
         private const string friendsAchievementFeedCacheFileName = "friend_achievement_cache.json";
         private const int MaxRecentFriendAchievements = 2;
 
@@ -144,9 +149,68 @@ namespace SteamFriendsFullscreen
 
             AddSettingsSupportSafe("SteamFriendsFullscreen", "Settings");
 
-            StartTimer();
+            // Do not start Steam polling from the constructor.
+            // Theme resources can still be loading here, so compatibility detection is safer in OnApplicationStarted.
         }
 
+
+        private bool IsCompatibilityDisabledByAnikiHelper => Settings?.CompatibilityDisabledByAnikiHelper == true;
+
+        private bool RefreshCompatibilityState()
+        {
+            var disabled = IsAnikiThemeMarkerActive();
+
+            if (Settings != null)
+            {
+                Settings.CompatibilityDisabledByAnikiHelper = disabled;
+                Settings.CompatibilityStatus = disabled
+                    ? "Steam Friends Fullscreen disabled: active Aniki theme marker detected."
+                    : "Steam Friends Fullscreen legacy mode active.";
+
+                if (disabled)
+                {
+                    Settings.LastError = Settings.CompatibilityStatus;
+                    Settings.IsSteamRunning = false;
+                    Settings.ToastIsVisible = false;
+                }
+            }
+
+            if (disabled)
+            {
+                logger.Info("[SteamFriendsFullscreen] Active Aniki theme marker detected. Legacy Steam Friends services are disabled to avoid duplicate timers/Steam refreshes.");
+                StopTimer();
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool IsAnikiThemeMarkerActive()
+        {
+            // Same principle as Aniki Helper: the active theme must expose a XAML resource marker.
+            // This avoids disabling Steam Friends Fullscreen when Aniki Helper is only installed but not used.
+            try
+            {
+                var app = Application.Current;
+                if (app == null)
+                {
+                    return false;
+                }
+
+                var marker = app.TryFindResource(AnikiThemeMarkerResourceKey);
+                if (marker is bool enabled)
+                {
+                    return enabled;
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                logger.Warn(ex, "[SteamFriendsFullscreen] Failed to check Aniki theme marker.");
+                return false;
+            }
+        }
 
         private void AddSettingsSupportSafe(string sourceName, string settingsRootPropertyName)
         {
@@ -166,6 +230,12 @@ namespace SteamFriendsFullscreen
 
         public void OpenFriendProfileWindow()
         {
+            if (IsCompatibilityDisabledByAnikiHelper)
+            {
+                logger.Info("[SteamFriendsFullscreen] Window open ignored because Aniki Helper owns Steam friends.");
+                return;
+            }
+
             Application.Current?.Dispatcher?.Invoke(() =>
             {
                 if (friendProfileWindow != null && friendProfileWindow.IsVisible)
@@ -241,6 +311,12 @@ namespace SteamFriendsFullscreen
 
         public void OpenFriendActionsWindow()
         {
+            if (IsCompatibilityDisabledByAnikiHelper)
+            {
+                logger.Info("[SteamFriendsFullscreen] Friend actions menu ignored because Aniki Helper owns Steam friends.");
+                return;
+            }
+
             Application.Current?.Dispatcher?.Invoke(() =>
             {
                 if (friendActionsWindow != null && friendActionsWindow.IsVisible)
@@ -320,6 +396,12 @@ namespace SteamFriendsFullscreen
 
         public void OpenSelfStatusWindow()
         {
+            if (IsCompatibilityDisabledByAnikiHelper)
+            {
+                logger.Info("[SteamFriendsFullscreen] Window open ignored because Aniki Helper owns Steam friends.");
+                return;
+            }
+
             Application.Current?.Dispatcher?.Invoke(() =>
             {
                 if (selfStatusWindow != null && selfStatusWindow.IsVisible)
@@ -438,11 +520,59 @@ namespace SteamFriendsFullscreen
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
-            StartTimer();
+            StartTimerAfterThemeCompatibilityCheckAsync();
+        }
+
+        private async void StartTimerAfterThemeCompatibilityCheckAsync()
+        {
+            try
+            {
+                // Give the fullscreen theme enough time to load its resources, including Aniki_ThemeMarker.
+                await Task.Delay(750);
+
+                Application.Current?.Dispatcher?.Invoke(() =>
+                {
+                    if (IsAnikiThemeMarkerActive())
+                    {
+                        if (Settings != null)
+                        {
+                            Settings.CompatibilityDisabledByAnikiHelper = true;
+                            Settings.CompatibilityStatus = "Steam Friends Fullscreen disabled: active Aniki theme marker detected.";
+                            Settings.LastError = Settings.CompatibilityStatus;
+                            Settings.IsSteamRunning = false;
+                            Settings.ToastIsVisible = false;
+                            SavePluginSettings(Settings);
+                        }
+
+                        StopTimer();
+                        return;
+                    }
+
+                    if (Settings != null)
+                    {
+                        Settings.CompatibilityDisabledByAnikiHelper = false;
+                        Settings.CompatibilityStatus = "Steam Friends Fullscreen legacy mode active.";
+                        SavePluginSettings(Settings);
+                    }
+
+                    StartTimer();
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.Warn(ex, "[SteamFriendsFullscreen] Failed during delayed Aniki marker compatibility check.");
+                StartTimer();
+            }
         }
 
         public override void OnControllerButtonStateChanged(OnControllerButtonStateChangedArgs args)
         {
+            if (IsCompatibilityDisabledByAnikiHelper)
+            {
+                base.OnControllerButtonStateChanged(args);
+                return;
+            }
+
             if (args.State != ControllerInputState.Pressed)
             {
                 base.OnControllerButtonStateChanged(args);
@@ -531,6 +661,11 @@ namespace SteamFriendsFullscreen
                 return false;
             }
 
+            if (IsCompatibilityDisabledByAnikiHelper)
+            {
+                return false;
+            }
+
             // Fullscreen: useful for the theme UI (Playnite toast + lists)
             if (IsFullscreenMode())
             {
@@ -558,6 +693,11 @@ namespace SteamFriendsFullscreen
 
         public void StartTimer()
         {
+            if (RefreshCompatibilityState())
+            {
+                return;
+            }
+
             // Run only when needed (Fullscreen OR Desktop with Windows notifications)
             if (!ShouldRunTimer())
             {
@@ -1424,7 +1564,7 @@ namespace SteamFriendsFullscreen
                         })
                         .ToList(),
 
-                        recentAchievements = LoadRecentFriendAchievements(friendSteamId)
+                    recentAchievements = LoadRecentFriendAchievements(friendSteamId)
                 };
 
                 friendProfileCache.Save(new CachedFriendProfile
@@ -1806,9 +1946,9 @@ namespace SteamFriendsFullscreen
                     var f = onlineTop[i];
                     sb.Append(f.steamid ?? "").Append("|");
                     sb.Append(f.state ?? "").Append("|");
-                    sb.Append(f.stateLoc ?? "").Append("|"); 
+                    sb.Append(f.stateLoc ?? "").Append("|");
                     sb.Append(f.game ?? "").Append("|");
-                    sb.Append(f.avatar ?? "").Append("|"); 
+                    sb.Append(f.avatar ?? "").Append("|");
                 }
             }
 
