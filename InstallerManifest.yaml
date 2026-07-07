@@ -85,3 +85,14 @@ Packages:
     Changelog:
       - Added a new action menu.
       - Added the ability to open a Steam chat directly from the Friends view.
+  - Version: 1.9
+    RequiredApiVersion: 6.16.0
+    ReleaseDate: 2026-07-07
+    PackageUrl: https://github.com/Mike-Aniki/Steam_Friends_Fullscreen/releases/download/v1.9/SteamFriendsFullscreen_d8d67c7e-a797-45d7-ae44-3d53ddecc8d1_1_9_0.pext
+    Changelog:
+      - This update prepares Steam Friends Fullscreen for future integration into Aniki Helper. Users can keep both plugins installed without causing duplicate Steam refreshes when using Aniki ReMake.
+      - Added compatibility detection with Aniki ReMake, If Aniki ReMake is active, Steam Friends Fullscreen enters compatibility mode and stops its Steam refresh services. If another theme is active, Steam Friends Fullscreen continues to work normally. This prevents duplicate Steam refresh timers, duplicate friend presence updates, and duplicated notification systems when Aniki Helper handles Steam friends integration.
+      - Steam polling no longer starts from the plugin constructor.
+      - The refresh timer now starts only after Playnite and the active fullscreen theme have finished loading.
+
+
