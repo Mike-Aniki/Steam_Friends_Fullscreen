@@ -94,5 +94,18 @@ Packages:
       - Added compatibility detection with Aniki ReMake, If Aniki ReMake is active, Steam Friends Fullscreen enters compatibility mode and stops its Steam refresh services. If another theme is active, Steam Friends Fullscreen continues to work normally. This prevents duplicate Steam refresh timers, duplicate friend presence updates, and duplicated notification systems when Aniki Helper handles Steam friends integration.
       - Steam polling no longer starts from the plugin constructor.
       - The refresh timer now starts only after Playnite and the active fullscreen theme have finished loading.
-
-
+  - Version: 2.0
+    RequiredApiVersion: 6.16.0
+    ReleaseDate: 2026-07-25
+    PackageUrl: https://github.com/Mike-Aniki/Steam_Friends_Fullscreen/releases/download/v2.0/SteamFriendsFullscreen_d8d67c7e-a797-45d7-ae44-3d53ddecc8d1_2_0.pext
+    Changelog:
+      - Added Steam login using a QR code.
+      - WebLogin is now the primary connection method.
+      - Your Steam friends list can remain private when using WebLogin.
+      - Added an optional Steam Web API key fallback.
+      - The API key can also be used without QR login.
+      - When both methods are configured, the API key automatically takes over if the Steam session becomes unavailable.
+      - Steam tokens and API keys are now encrypted using Windows DPAPI.
+      - Added API connection testing and more precise error messages.
+      - Existing Fullscreen theme integrations remain compatible.
+      - Just a reminder Aniki Remake no longer uses this plugin.
