@@ -1,9 +1,10 @@
-using Playnite.SDK;
+﻿using Playnite.SDK;
 using Playnite.SDK.Data;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Win32;
@@ -23,6 +24,14 @@ namespace SteamFriendsFullscreen
         PlayniteAndWindows = 3
     }
 
+    public enum SteamConnectionTestState
+    {
+        None = 0,
+        Running = 1,
+        Success = 2,
+        Error = 3
+    }
+
     public class SteamFriendsFullscreenSettings : ObservableObject
     {
         public int RefreshSeconds => 60;
@@ -30,7 +39,10 @@ namespace SteamFriendsFullscreen
         public int MaxOfflineShown => 40;
 
         private string steamApiKey = string.Empty;
+        private string steamApiKeyEncrypted = string.Empty;
         private string steamId64 = string.Empty;
+        private bool steamApiKeyMigrationRequired;
+        private bool steamApiKeyDecryptionFailed;
 
         // Offline toggle 
         private bool showOffline = false;
@@ -66,16 +78,400 @@ namespace SteamFriendsFullscreen
         }
 
 
+        /// <summary>
+        /// Decrypted API key used only at runtime. This value is never serialized.
+        /// </summary>
+        [DontSerialize]
         public string SteamApiKey
         {
             get => steamApiKey;
-            set => SetValue(ref steamApiKey, value);
+            set
+            {
+                var normalized = (value ?? string.Empty).Trim();
+                if (string.Equals(steamApiKey, normalized, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                SetSteamApiKey(normalized, updateEncryptedValue: true);
+                ResetSteamConnectionTest();
+            }
+        }
+
+        /// <summary>
+        /// DPAPI-protected API key saved in the plugin settings file.
+        /// </summary>
+        public string SteamApiKeyEncrypted
+        {
+            get => steamApiKeyEncrypted;
+            set
+            {
+                SetValue(ref steamApiKeyEncrypted, value ?? string.Empty);
+
+                string decrypted;
+                if (SteamApiKeyProtector.TryUnprotect(steamApiKeyEncrypted, out decrypted))
+                {
+                    steamApiKeyDecryptionFailed = false;
+                    SetRuntimeSteamApiKey(decrypted);
+                }
+                else
+                {
+                    steamApiKeyDecryptionFailed = true;
+                    SetRuntimeSteamApiKey(string.Empty);
+                }
+            }
+        }
+
+        /// <summary>
+        /// One-way migration bridge for settings created before DPAPI support.
+        /// The old JSON property can still be read, but it has no getter and is
+        /// therefore never written back to disk in plaintext.
+        /// </summary>
+        [SerializationPropertyName("SteamApiKey")]
+        public string LegacySteamApiKey
+        {
+            set
+            {
+                if (!string.IsNullOrWhiteSpace(steamApiKeyEncrypted) ||
+                    string.IsNullOrWhiteSpace(value))
+                {
+                    return;
+                }
+
+                SetSteamApiKey(value, updateEncryptedValue: true);
+                steamApiKeyMigrationRequired = true;
+            }
+        }
+
+        [DontSerialize]
+        public bool SteamApiKeyMigrationRequired => steamApiKeyMigrationRequired;
+
+        [DontSerialize]
+        public bool SteamApiKeyDecryptionFailed => steamApiKeyDecryptionFailed;
+
+        public void MarkSteamApiKeyMigrationComplete()
+        {
+            steamApiKeyMigrationRequired = false;
+        }
+
+        private void SetSteamApiKey(string value, bool updateEncryptedValue)
+        {
+            var normalized = (value ?? string.Empty).Trim();
+            SetRuntimeSteamApiKey(normalized);
+
+            if (!updateEncryptedValue)
+            {
+                return;
+            }
+
+            var encrypted = SteamApiKeyProtector.Protect(normalized);
+            SetValue(ref steamApiKeyEncrypted, encrypted);
+            steamApiKeyDecryptionFailed = false;
+        }
+
+        private void SetRuntimeSteamApiKey(string value)
+        {
+            SetValue(ref steamApiKey, value ?? string.Empty);
         }
 
         public string SteamId64
         {
             get => steamId64;
-            set => SetValue(ref steamId64, value);
+            set
+            {
+                var normalized = value ?? string.Empty;
+                if (string.Equals(steamId64, normalized, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                SetValue(ref steamId64, normalized);
+                ResetSteamConnectionTest();
+            }
+        }
+
+        private string steamWebLoginAccessToken = string.Empty;
+        private string steamWebLoginRefreshToken = string.Empty;
+        private string steamWebLoginAccessTokenEncrypted = string.Empty;
+        private string steamWebLoginRefreshTokenEncrypted = string.Empty;
+        private string steamWebLoginSteamId64 = string.Empty;
+        private string steamWebLoginAccountName = string.Empty;
+        private DateTime steamWebLoginAccessTokenExpiresUtc = DateTime.MinValue;
+        private SteamWebLoginState webLoginState = SteamWebLoginState.Disconnected;
+        private string webLoginStatusMessage;
+        private ImageSource webLoginQrImage;
+        private SteamActiveDataSource activeDataSource = SteamActiveDataSource.None;
+        private string activeDataSourceDetail;
+
+        [DontSerialize]
+        public string SteamWebLoginAccessToken => steamWebLoginAccessToken;
+
+        [DontSerialize]
+        public string SteamWebLoginRefreshToken => steamWebLoginRefreshToken;
+
+        public string SteamWebLoginAccessTokenEncrypted
+        {
+            get => steamWebLoginAccessTokenEncrypted;
+            set
+            {
+                SetValue(ref steamWebLoginAccessTokenEncrypted, value ?? string.Empty);
+                string decrypted;
+                steamWebLoginAccessToken = SteamWebLoginTokenProtector.TryUnprotect(value, out decrypted)
+                    ? decrypted
+                    : string.Empty;
+                OnPropertyChanged(nameof(HasWebLoginSession));
+            }
+        }
+
+        public string SteamWebLoginRefreshTokenEncrypted
+        {
+            get => steamWebLoginRefreshTokenEncrypted;
+            set
+            {
+                SetValue(ref steamWebLoginRefreshTokenEncrypted, value ?? string.Empty);
+                string decrypted;
+                steamWebLoginRefreshToken = SteamWebLoginTokenProtector.TryUnprotect(value, out decrypted)
+                    ? decrypted
+                    : string.Empty;
+                OnPropertyChanged(nameof(HasWebLoginSession));
+                OnPropertyChanged(nameof(CanDisconnectWebLogin));
+            }
+        }
+
+        public string SteamWebLoginSteamId64
+        {
+            get => steamWebLoginSteamId64;
+            set
+            {
+                SetValue(ref steamWebLoginSteamId64, value ?? string.Empty);
+                OnPropertyChanged(nameof(HasWebLoginSession));
+                OnPropertyChanged(nameof(CanDisconnectWebLogin));
+            }
+        }
+
+        public string SteamWebLoginAccountName
+        {
+            get => steamWebLoginAccountName;
+            set => SetValue(ref steamWebLoginAccountName, value ?? string.Empty);
+        }
+
+        public DateTime SteamWebLoginAccessTokenExpiresUtc
+        {
+            get => steamWebLoginAccessTokenExpiresUtc;
+            set => SetValue(ref steamWebLoginAccessTokenExpiresUtc, value);
+        }
+
+        [DontSerialize]
+        public SteamWebLoginState WebLoginState
+        {
+            get => webLoginState;
+            set
+            {
+                SetValue(ref webLoginState, value);
+                OnPropertyChanged(nameof(IsWebLoginOperationRunning));
+                OnPropertyChanged(nameof(CanConnectWebLogin));
+                OnPropertyChanged(nameof(CanDisconnectWebLogin));
+            }
+        }
+
+        [DontSerialize]
+        public string WebLoginStatusMessage
+        {
+            get => webLoginStatusMessage;
+            set => SetValue(ref webLoginStatusMessage, value);
+        }
+
+        [DontSerialize]
+        public ImageSource WebLoginQrImage
+        {
+            get => webLoginQrImage;
+            set => SetValue(ref webLoginQrImage, value);
+        }
+
+        [DontSerialize]
+        public bool HasWebLoginSession =>
+            !string.IsNullOrWhiteSpace(steamWebLoginSteamId64) &&
+            !string.IsNullOrWhiteSpace(steamWebLoginRefreshToken);
+
+        [DontSerialize]
+        public bool IsWebLoginOperationRunning =>
+            WebLoginState == SteamWebLoginState.Connecting ||
+            WebLoginState == SteamWebLoginState.WaitingForScan ||
+            WebLoginState == SteamWebLoginState.Refreshing;
+
+        [DontSerialize]
+        public bool CanConnectWebLogin => !IsWebLoginOperationRunning;
+
+        [DontSerialize]
+        public bool CanDisconnectWebLogin => HasWebLoginSession || IsWebLoginOperationRunning;
+
+        [DontSerialize]
+        public SteamActiveDataSource ActiveDataSource
+        {
+            get => activeDataSource;
+            set => SetValue(ref activeDataSource, value);
+        }
+
+        [DontSerialize]
+        public string ActiveDataSourceDetail
+        {
+            get => activeDataSourceDetail;
+            set => SetValue(ref activeDataSourceDetail, value);
+        }
+
+        public void ApplyWebLoginSession(SteamWebLoginSession session)
+        {
+            if (session == null)
+            {
+                return;
+            }
+
+            steamWebLoginAccessToken = session.AccessToken ?? string.Empty;
+            steamWebLoginRefreshToken = session.RefreshToken ?? string.Empty;
+            SteamWebLoginAccessTokenEncrypted = SteamWebLoginTokenProtector.Protect(steamWebLoginAccessToken);
+            SteamWebLoginRefreshTokenEncrypted = SteamWebLoginTokenProtector.Protect(steamWebLoginRefreshToken);
+            SteamWebLoginSteamId64 = session.SteamId64;
+            SteamWebLoginAccountName = session.AccountName;
+            SteamWebLoginAccessTokenExpiresUtc = session.AccessTokenExpiresUtc;
+
+            if (!string.IsNullOrWhiteSpace(session.SteamId64))
+            {
+                SteamId64 = session.SteamId64;
+            }
+
+            WebLoginState = SteamWebLoginState.Connected;
+            WebLoginQrImage = null;
+            OnPropertyChanged(nameof(HasWebLoginSession));
+            OnPropertyChanged(nameof(CanDisconnectWebLogin));
+        }
+
+        public void CopyWebLoginPersistentStateFrom(SteamFriendsFullscreenSettings source)
+        {
+            if (source == null || ReferenceEquals(this, source))
+            {
+                return;
+            }
+
+            SteamWebLoginAccessTokenEncrypted = source.SteamWebLoginAccessTokenEncrypted;
+            SteamWebLoginRefreshTokenEncrypted = source.SteamWebLoginRefreshTokenEncrypted;
+            SteamWebLoginSteamId64 = source.SteamWebLoginSteamId64;
+            SteamWebLoginAccountName = source.SteamWebLoginAccountName;
+            SteamWebLoginAccessTokenExpiresUtc = source.SteamWebLoginAccessTokenExpiresUtc;
+
+            WebLoginState = source.WebLoginState;
+            WebLoginStatusMessage = source.WebLoginStatusMessage;
+            WebLoginQrImage = source.WebLoginQrImage;
+            ActiveDataSource = source.ActiveDataSource;
+            ActiveDataSourceDetail = source.ActiveDataSourceDetail;
+        }
+
+        public void ClearWebLoginSession()
+        {
+            steamWebLoginAccessToken = string.Empty;
+            steamWebLoginRefreshToken = string.Empty;
+            SteamWebLoginAccessTokenEncrypted = string.Empty;
+            SteamWebLoginRefreshTokenEncrypted = string.Empty;
+            SteamWebLoginSteamId64 = string.Empty;
+            SteamWebLoginAccountName = string.Empty;
+            SteamWebLoginAccessTokenExpiresUtc = DateTime.MinValue;
+            WebLoginQrImage = null;
+            WebLoginState = SteamWebLoginState.Disconnected;
+            ActiveDataSource = SteamActiveDataSource.None;
+            ActiveDataSourceDetail = null;
+            OnPropertyChanged(nameof(HasWebLoginSession));
+            OnPropertyChanged(nameof(CanDisconnectWebLogin));
+        }
+
+        public void SetWebLoginConnecting(string message)
+        {
+            WebLoginState = SteamWebLoginState.Connecting;
+            WebLoginStatusMessage = message;
+            WebLoginQrImage = null;
+        }
+
+        public void SetWebLoginWaitingForScan(string message, ImageSource qrImage)
+        {
+            WebLoginState = SteamWebLoginState.WaitingForScan;
+            WebLoginStatusMessage = message;
+            WebLoginQrImage = qrImage;
+        }
+
+        public void SetWebLoginConnectedMessage(string message)
+        {
+            WebLoginState = SteamWebLoginState.Connected;
+            WebLoginStatusMessage = message;
+            WebLoginQrImage = null;
+        }
+
+        public void SetWebLoginRefreshing()
+        {
+            WebLoginState = SteamWebLoginState.Refreshing;
+        }
+
+        public void MarkWebLoginHealthy()
+        {
+            WebLoginState = SteamWebLoginState.Connected;
+            WebLoginQrImage = null;
+
+            if (string.IsNullOrWhiteSpace(WebLoginStatusMessage) ||
+                WebLoginStatusMessage.IndexOf("failed", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                WebLoginStatusMessage.IndexOf("error", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                WebLoginStatusMessage = string.IsNullOrWhiteSpace(SteamWebLoginAccountName)
+                    ? SteamWebLoginSteamId64
+                    : SteamWebLoginAccountName;
+            }
+        }
+
+        public void SetWebLoginRuntimeError(string detail)
+        {
+            WebLoginState = SteamWebLoginState.Error;
+            WebLoginStatusMessage = detail;
+            WebLoginQrImage = null;
+        }
+
+        public void SetActiveDataSource(SteamActiveDataSource source, string detail)
+        {
+            ActiveDataSource = source;
+            ActiveDataSourceDetail = detail;
+        }
+
+        private bool isSteamConnectionTestRunning;
+        private string steamConnectionTestMessage;
+        private SteamConnectionTestState steamConnectionTestState = SteamConnectionTestState.None;
+
+        [DontSerialize]
+        public bool IsSteamConnectionTestRunning
+        {
+            get => isSteamConnectionTestRunning;
+            set
+            {
+                SetValue(ref isSteamConnectionTestRunning, value);
+                OnPropertyChanged(nameof(CanTestSteamConnection));
+            }
+        }
+
+        [DontSerialize]
+        public bool CanTestSteamConnection => !IsSteamConnectionTestRunning;
+
+        [DontSerialize]
+        public string SteamConnectionTestMessage
+        {
+            get => steamConnectionTestMessage;
+            set => SetValue(ref steamConnectionTestMessage, value);
+        }
+
+        [DontSerialize]
+        public SteamConnectionTestState ConnectionTestState
+        {
+            get => steamConnectionTestState;
+            set => SetValue(ref steamConnectionTestState, value);
+        }
+
+        public void ResetSteamConnectionTest()
+        {
+            ConnectionTestState = SteamConnectionTestState.None;
+            SteamConnectionTestMessage = null;
         }
 
         public bool ShowOffline
@@ -382,6 +778,7 @@ namespace SteamFriendsFullscreen
 
     public class SteamFriendsFullscreenSettingsViewModel : ObservableObject, ISettings
     {
+        private static readonly ILogger logger = LogManager.GetLogger();
         private readonly SteamFriendsFullscreen plugin;
         private SteamFriendsFullscreenSettings editingClone;
 
@@ -435,6 +832,14 @@ namespace SteamFriendsFullscreen
                     }
                 }
                 catch { }
+            }
+
+            if (Settings.SteamApiKeyMigrationRequired)
+            {
+                // Immediately rewrite legacy settings so the plaintext key is
+                // removed from the configuration file on the first launch.
+                plugin.SavePluginSettings(Settings);
+                Settings.MarkSteamApiKeyMigrationComplete();
             }
 
             Settings.EnsureRuntimeCollections();
@@ -732,6 +1137,192 @@ namespace SteamFriendsFullscreen
 
         }
 
+        public async Task TestSteamConnectionAsync()
+        {
+            if (Settings == null || Settings.IsSteamConnectionTestRunning)
+            {
+                return;
+            }
+
+            Settings.IsSteamConnectionTestRunning = true;
+            Settings.ConnectionTestState = SteamConnectionTestState.Running;
+            Settings.SteamConnectionTestMessage = GetStringSafe(
+                "LOCSteamFriends_TestConnectionRunning",
+                "Testing the Steam connection...");
+
+            try
+            {
+                var result = await plugin.TestSteamConnectionAsync(
+                    Settings.SteamApiKey,
+                    Settings.SteamId64);
+
+                ApplyConnectionTestResult(result);
+            }
+            catch (Exception ex)
+            {
+                Settings.ConnectionTestState = SteamConnectionTestState.Error;
+                Settings.SteamConnectionTestMessage = GetStringSafe(
+                    "LOCSteamFriends_TestErrorUnknown",
+                    "An unexpected error occurred while testing the Steam connection.");
+
+                logger.Error(ex, "Unexpected error in Steam connection test UI.");
+            }
+            finally
+            {
+                Settings.IsSteamConnectionTestRunning = false;
+            }
+        }
+
+        public Task ConnectSteamWebLoginAsync()
+        {
+            return plugin.StartSteamWebLoginAsync();
+        }
+
+        public void DisconnectSteamWebLogin()
+        {
+            plugin.DisconnectSteamWebLogin();
+        }
+
+        private void ApplyConnectionTestResult(SteamConnectionTestResult result)
+        {
+            if (result == null)
+            {
+                Settings.ConnectionTestState = SteamConnectionTestState.Error;
+                Settings.SteamConnectionTestMessage = GetStringSafe(
+                    "LOCSteamFriends_TestErrorInvalidResponse",
+                    "Steam returned an invalid response.");
+                return;
+            }
+
+            Settings.ConnectionTestState = result.IsSuccess
+                ? SteamConnectionTestState.Success
+                : SteamConnectionTestState.Error;
+
+            switch (result.Code)
+            {
+                case SteamConnectionTestCode.Success:
+                    Settings.SteamConnectionTestMessage = string.Format(
+                        GetStringSafe(
+                            "LOCSteamFriends_TestSuccess",
+                            "Connection successful: {0} — {1} friends found."),
+                        string.IsNullOrWhiteSpace(result.PersonaName) ? result.SteamId64 : result.PersonaName,
+                        result.FriendCount);
+                    break;
+
+                case SteamConnectionTestCode.SuccessNoFriends:
+                    Settings.SteamConnectionTestMessage = string.Format(
+                        GetStringSafe(
+                            "LOCSteamFriends_TestSuccessNoFriends",
+                            "Connection successful: {0}. No friends were found."),
+                        string.IsNullOrWhiteSpace(result.PersonaName) ? result.SteamId64 : result.PersonaName);
+                    break;
+
+                case SteamConnectionTestCode.MissingApiKey:
+                    Settings.SteamConnectionTestMessage = GetStringSafe(
+                        "LOCSteamFriends_TestErrorMissingApiKey",
+                        "Enter your Steam Web API key.");
+                    break;
+
+                case SteamConnectionTestCode.InvalidApiKeyFormat:
+                    Settings.SteamConnectionTestMessage = GetStringSafe(
+                        "LOCSteamFriends_TestErrorApiKeyFormat",
+                        "The API key format is invalid. A Steam Web API key contains 32 hexadecimal characters.");
+                    break;
+
+                case SteamConnectionTestCode.MissingProfile:
+                    Settings.SteamConnectionTestMessage = GetStringSafe(
+                        "LOCSteamFriends_TestErrorMissingProfile",
+                        "Enter your Steam profile link, custom name, or SteamID64.");
+                    break;
+
+                case SteamConnectionTestCode.InvalidProfileFormat:
+                    Settings.SteamConnectionTestMessage = GetStringSafe(
+                        "LOCSteamFriends_TestErrorProfileFormat",
+                        "The Steam profile format is invalid.");
+                    break;
+
+                case SteamConnectionTestCode.ProfileNotFound:
+                    Settings.SteamConnectionTestMessage = GetStringSafe(
+                        "LOCSteamFriends_TestErrorProfileNotFound",
+                        "Steam could not find this profile. Check the profile link or SteamID64.");
+                    break;
+
+                case SteamConnectionTestCode.InvalidApiKey:
+                    Settings.SteamConnectionTestMessage = GetStringSafe(
+                        "LOCSteamFriends_TestErrorInvalidApiKey",
+                        "Steam rejected the API key. Check that it is valid and active.");
+                    break;
+
+                case SteamConnectionTestCode.FriendsListPrivate:
+                    Settings.SteamConnectionTestMessage = GetStringSafe(
+                        "LOCSteamFriends_TestErrorPrivateFriends",
+                        "The profile was found, but its Friends List is private. Set Friends List to Public in Steam privacy settings.");
+                    break;
+
+                case SteamConnectionTestCode.RateLimited:
+                    Settings.SteamConnectionTestMessage = GetStringSafe(
+                        "LOCSteamFriends_TestErrorRateLimited",
+                        "Steam is temporarily limiting requests. Try again later.");
+                    break;
+
+                case SteamConnectionTestCode.Timeout:
+                    Settings.SteamConnectionTestMessage = GetStringSafe(
+                        "LOCSteamFriends_TestErrorTimeout",
+                        "Steam did not respond in time. Check your connection and try again.");
+                    break;
+
+                case SteamConnectionTestCode.Network:
+                    Settings.SteamConnectionTestMessage = GetStringSafe(
+                        "LOCSteamFriends_TestErrorNetwork",
+                        "The Steam Web API could not be reached. Check your Internet connection.");
+                    break;
+
+                case SteamConnectionTestCode.SteamUnavailable:
+                    Settings.SteamConnectionTestMessage = GetStringSafe(
+                        "LOCSteamFriends_TestErrorUnavailable",
+                        "The Steam Web API is temporarily unavailable.");
+                    break;
+
+                case SteamConnectionTestCode.InvalidResponse:
+                    Settings.SteamConnectionTestMessage = GetStringSafe(
+                        "LOCSteamFriends_TestErrorInvalidResponse",
+                        "Steam returned an invalid response.");
+                    break;
+
+                case SteamConnectionTestCode.ApiError:
+                    Settings.SteamConnectionTestMessage = GetStringSafe(
+                        "LOCSteamFriends_TestErrorApi",
+                        "Steam returned an unexpected API error.");
+                    break;
+
+                default:
+                    Settings.SteamConnectionTestMessage = GetStringSafe(
+                        "LOCSteamFriends_TestErrorUnknown",
+                        "An unexpected error occurred while testing the Steam connection.");
+                    break;
+            }
+        }
+
+        private string GetStringSafe(string key, string fallback)
+        {
+            try
+            {
+                var value = plugin.PlayniteApi?.Resources?.GetString(key);
+                if (string.IsNullOrWhiteSpace(value) ||
+                    value == key ||
+                    (value.StartsWith("<!", StringComparison.Ordinal) && value.EndsWith("!>", StringComparison.Ordinal)))
+                {
+                    return fallback;
+                }
+
+                return value;
+            }
+            catch
+            {
+                return fallback;
+            }
+        }
+
         private static string GetSteamExe()
         {
             string Normalize(string s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim().Trim('"');
@@ -831,7 +1422,14 @@ namespace SteamFriendsFullscreen
 
         public void CancelEdit()
         {
-            Settings = editingClone;
+            // WebLogin connect/disconnect and token renewal are immediate external actions.
+            // Preserve only that persistent state when the rest of the settings edit is cancelled.
+            if (editingClone != null)
+            {
+                editingClone.CopyWebLoginPersistentStateFrom(Settings);
+                Settings = editingClone;
+            }
+
             Settings.EnsureRuntimeCollections();
 
             OnPropertyChanged(nameof(NotificationOutputMode));

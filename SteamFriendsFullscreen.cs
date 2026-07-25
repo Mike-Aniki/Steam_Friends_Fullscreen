@@ -1,4 +1,4 @@
-using Playnite.SDK;
+﻿using Playnite.SDK;
 using Playnite.SDK.Data;
 using Playnite.SDK.Events;
 using Playnite.SDK.Plugins;
@@ -18,6 +18,7 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace SteamFriendsFullscreen
 {
@@ -35,6 +36,10 @@ namespace SteamFriendsFullscreen
         private DateTime lastSuccessUtc = DateTime.MinValue;
 
         private SteamWebApiClient steamClient;
+        private SteamWebLoginApiClient webLoginApiClient;
+        private SteamWebLoginService webLoginService;
+        private SteamHybridDataClient hybridClient;
+        private CancellationTokenSource webLoginSignInCts;
         private Window selfStatusWindow;
         private Window friendProfileWindow;
         private Window friendActionsWindow;
@@ -85,7 +90,6 @@ namespace SteamFriendsFullscreen
         private readonly TimeSpan cachedFriendsExtendedTtl = TimeSpan.FromHours(6);
 
         // Cache avatars local
-        // Cache avatars local
         private string avatarCacheDir;
         private string gameHeaderCacheDir;
 
@@ -130,15 +134,25 @@ namespace SteamFriendsFullscreen
 
         public SteamFriendsFullscreen(IPlayniteAPI api) : base(api)
         {
+            steamClient = new SteamWebApiClient();
+            webLoginApiClient = new SteamWebLoginApiClient();
+            webLoginService = new SteamWebLoginService();
+            windowsToasts = new WindowsToastService();
             settingsVm = new SteamFriendsFullscreenSettingsViewModel(this);
+            hybridClient = new SteamHybridDataClient(
+                () => Settings,
+                steamClient,
+                webLoginApiClient,
+                webLoginService,
+                SaveCurrentSettingsSafe);
+
+            webLoginService.QrCodeChanged += OnSteamWebLoginQrCodeChanged;
+            InitializeWebLoginRuntimeState();
 
             Properties = new GenericPluginProperties
             {
                 HasSettings = true
             };
-
-            steamClient = new SteamWebApiClient();
-            windowsToasts = new WindowsToastService();
 
             avatarCacheDir = Path.Combine(GetPluginUserDataPath(), "AvatarCache");
             gameHeaderCacheDir = Path.Combine(GetPluginUserDataPath(), "GameHeaderCache");
@@ -153,6 +167,208 @@ namespace SteamFriendsFullscreen
             // Theme resources can still be loading here, so compatibility detection is safer in OnApplicationStarted.
         }
 
+
+        public Task<SteamConnectionTestResult> TestSteamConnectionAsync(string apiKey, string profileInput)
+        {
+            return steamClient.TestConnectionAsync(apiKey, profileInput);
+        }
+
+
+        public async Task StartSteamWebLoginAsync()
+        {
+            if (Settings == null || Settings.IsWebLoginOperationRunning)
+            {
+                return;
+            }
+
+            try
+            {
+                try { webLoginSignInCts?.Cancel(); } catch { }
+                try { webLoginSignInCts?.Dispose(); } catch { }
+                webLoginSignInCts = new CancellationTokenSource();
+
+                InvokeOnUi(() => Settings.SetWebLoginConnecting(GetStringSafe(
+                    "LOCSteamFriends_WebLoginConnecting",
+                    "Connecting to Steam...")));
+
+                var session = await webLoginService
+                    .SignInWithQrAsync(webLoginSignInCts.Token)
+                    .ConfigureAwait(false);
+
+                InvokeOnUiSync(() =>
+                {
+                    Settings.ApplyWebLoginSession(session);
+                    Settings.SetWebLoginConnectedMessage(string.Format(
+                        GetStringSafe(
+                            "LOCSteamFriends_WebLoginConnectedAs",
+                            "Connected as {0}."),
+                        string.IsNullOrWhiteSpace(session.AccountName)
+                            ? session.SteamId64
+                            : session.AccountName));
+                    Settings.SetActiveDataSource(SteamActiveDataSource.WebLogin, null);
+                    SaveCurrentSettingsSafe();
+                });
+
+                hybridClient.ResetWebLoginBackoff();
+                ResetSteamDataCaches();
+                await ForceRefreshAndWaitAsync().ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                InvokeOnUi(() =>
+                {
+                    if (Settings.HasWebLoginSession)
+                    {
+                        Settings.SetWebLoginConnectedMessage(string.Format(
+                            GetStringSafe("LOCSteamFriends_WebLoginConnectedAs", "Connected as {0}."),
+                            string.IsNullOrWhiteSpace(Settings.SteamWebLoginAccountName)
+                                ? Settings.SteamWebLoginSteamId64
+                                : Settings.SteamWebLoginAccountName));
+                    }
+                    else
+                    {
+                        Settings.WebLoginState = SteamWebLoginState.Disconnected;
+                        Settings.WebLoginStatusMessage = GetStringSafe(
+                            "LOCSteamFriends_WebLoginDisconnected",
+                            "Steam WebLogin is not connected.");
+                        Settings.WebLoginQrImage = null;
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Steam WebLogin QR authentication failed.");
+                InvokeOnUi(() =>
+                {
+                    Settings.SetWebLoginRuntimeError(GetStringSafe(
+                        "LOCSteamFriends_WebLoginError",
+                        "Steam WebLogin failed. Try again or use the optional API key fallback."));
+                });
+            }
+        }
+
+        public void DisconnectSteamWebLogin()
+        {
+            try { webLoginSignInCts?.Cancel(); } catch { }
+            try { webLoginService?.CancelCurrentOperation(); } catch { }
+
+            InvokeOnUiSync(() =>
+            {
+                Settings?.ClearWebLoginSession();
+                if (Settings != null)
+                {
+                    Settings.WebLoginStatusMessage = GetStringSafe(
+                        "LOCSteamFriends_WebLoginDisconnected",
+                        "Steam WebLogin is not connected.");
+                    SaveCurrentSettingsSafe();
+                }
+            });
+
+            hybridClient.ResetWebLoginBackoff();
+            ResetSteamDataCaches();
+            _ = ForceRefreshAndWaitAsync();
+        }
+
+        private void InitializeWebLoginRuntimeState()
+        {
+            if (Settings == null)
+            {
+                return;
+            }
+
+            if (Settings.HasWebLoginSession)
+            {
+                Settings.SetWebLoginConnectedMessage(string.Format(
+                    GetStringSafe("LOCSteamFriends_WebLoginConnectedAs", "Connected as {0}."),
+                    string.IsNullOrWhiteSpace(Settings.SteamWebLoginAccountName)
+                        ? Settings.SteamWebLoginSteamId64
+                        : Settings.SteamWebLoginAccountName));
+            }
+            else
+            {
+                Settings.WebLoginState = SteamWebLoginState.Disconnected;
+                Settings.WebLoginStatusMessage = GetStringSafe(
+                    "LOCSteamFriends_WebLoginDisconnected",
+                    "Steam WebLogin is not connected.");
+            }
+        }
+
+        private void OnSteamWebLoginQrCodeChanged(byte[] pngBytes)
+        {
+            if (pngBytes == null || pngBytes.Length == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                var image = new BitmapImage();
+                using (var stream = new MemoryStream(pngBytes))
+                {
+                    image.BeginInit();
+                    image.CacheOption = BitmapCacheOption.OnLoad;
+                    image.StreamSource = stream;
+                    image.EndInit();
+                    image.Freeze();
+                }
+
+                InvokeOnUi(() => Settings?.SetWebLoginWaitingForScan(
+                    GetStringSafe(
+                        "LOCSteamFriends_WebLoginScanQr",
+                        "Scan this QR code with the Steam mobile app, then approve the sign-in."),
+                    image));
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Failed to display the Steam WebLogin QR code.");
+            }
+        }
+
+        private void SaveCurrentSettingsSafe()
+        {
+            InvokeOnUiSync(() =>
+            {
+                try
+                {
+                    if (Settings != null)
+                    {
+                        SavePluginSettings(Settings);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.Warn(ex, "Failed to save Steam WebLogin settings.");
+                }
+            });
+        }
+
+        private void ResetSteamDataCaches()
+        {
+            cachedFriendIds = null;
+            friendIdsLastFetchUtc = DateTime.MinValue;
+            cachedFriendsExtended = null;
+            cachedFriendsExtendedLastFetchUtc = DateTime.MinValue;
+            cachedResolvedSteamId64 = null;
+            cachedSteamIdInput = null;
+            steamIdResolveLastUtc = DateTime.MinValue;
+            lastUiSignature = null;
+            hasBaseline = false;
+            lastState.Clear();
+            lastGame.Clear();
+        }
+
+        private async Task<string> GetConfiguredSelfSteamId64Async()
+        {
+            if (Settings?.HasWebLoginSession == true &&
+                !string.IsNullOrWhiteSpace(Settings.SteamWebLoginSteamId64))
+            {
+                return Settings.SteamWebLoginSteamId64.Trim();
+            }
+
+            var apiKey = Settings?.SteamApiKey?.Trim();
+            var steamIdInput = Settings?.SteamId64?.Trim();
+            return await ResolveSteamId64Async(apiKey, steamIdInput).ConfigureAwait(false);
+        }
 
         private bool IsCompatibilityDisabledByAnikiHelper => Settings?.CompatibilityDisabledByAnikiHelper == true;
 
@@ -638,6 +854,10 @@ namespace SteamFriendsFullscreen
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
         {
             StopTimer();
+            try { webLoginSignInCts?.Cancel(); } catch { }
+            try { webLoginSignInCts?.Dispose(); } catch { }
+            try { webLoginService?.Dispose(); } catch { }
+            try { webLoginApiClient?.Dispose(); } catch { }
             try { http.Dispose(); } catch { }
         }
 
@@ -1130,6 +1350,31 @@ namespace SteamFriendsFullscreen
         }
 
 
+        private void InvokeOnUiSync(Action action)
+        {
+            if (action == null)
+            {
+                return;
+            }
+
+            try
+            {
+                var dispatcher = Application.Current?.Dispatcher;
+                if (dispatcher == null || dispatcher.CheckAccess())
+                {
+                    action();
+                }
+                else
+                {
+                    dispatcher.Invoke(action);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Warn(ex, "Failed to execute a synchronous UI action.");
+            }
+        }
+
         private void InvokeOnUi(Action action)
         {
             try
@@ -1222,13 +1467,17 @@ namespace SteamFriendsFullscreen
 
                 return resolved;
             }
+            catch (SteamWebApiException)
+            {
+                throw;
+            }
             catch
             {
                 return null;
             }
         }
 
-        private async Task<System.Collections.Generic.List<SteamFriend>> GetExtendedFriendsAsync(string apiKey, string steamId64)
+        private async Task<System.Collections.Generic.List<SteamFriend>> GetExtendedFriendsAsync(string steamId64)
         {
             var nowUtc = DateTime.UtcNow;
 
@@ -1242,7 +1491,7 @@ namespace SteamFriendsFullscreen
                 return cachedFriendsExtended;
             }
 
-            var friends = await steamClient.GetFriendsAsync(apiKey, steamId64).ConfigureAwait(false);
+            var friends = await hybridClient.GetFriendsAsync(steamId64).ConfigureAwait(false);
             cachedFriendsExtended = friends ?? new System.Collections.Generic.List<SteamFriend>();
             cachedFriendsExtendedLastFetchUtc = nowUtc;
 
@@ -1416,18 +1665,34 @@ namespace SteamFriendsFullscreen
                 return;
             }
 
-            var apiKey = Settings.SteamApiKey?.Trim();
-            var steamIdInput = Settings.SteamId64?.Trim();
-            var selfSteamId64 = await ResolveSteamId64Async(apiKey, steamIdInput).ConfigureAwait(false);
-
-            if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(selfSteamId64))
+            if (!Settings.HasWebLoginSession && string.IsNullOrWhiteSpace(Settings.SteamApiKey))
             {
                 InvokeOnUi(() =>
                 {
                     Settings.IsFriendProfileOpen = true;
                     Settings.SelectedFriendSteamId = friendSteamId;
                     Settings.SelectedFriendProfile = null;
-                    Settings.FriendProfileError = "Missing API key or Steam profile.";
+                    Settings.FriendProfileError = GetStringSafe(
+                        "LOCSteamFriends_WebLoginOrApiRequired",
+                        "Connect Steam with WebLogin or configure the optional API key fallback.");
+                    Settings.IsFriendProfileLoading = false;
+                });
+                return;
+            }
+
+            var selfSteamId64 = await GetConfiguredSelfSteamId64Async().ConfigureAwait(false);
+
+            if (string.IsNullOrWhiteSpace(selfSteamId64) ||
+                (!Settings.HasWebLoginSession && string.IsNullOrWhiteSpace(Settings.SteamApiKey)))
+            {
+                InvokeOnUi(() =>
+                {
+                    Settings.IsFriendProfileOpen = true;
+                    Settings.SelectedFriendSteamId = friendSteamId;
+                    Settings.SelectedFriendProfile = null;
+                    Settings.FriendProfileError = GetStringSafe(
+                        "LOCSteamFriends_WebLoginOrApiRequired",
+                        "Connect Steam with WebLogin or configure the optional API key fallback.");
                     Settings.IsFriendProfileLoading = false;
                 });
                 return;
@@ -1500,11 +1765,11 @@ namespace SteamFriendsFullscreen
                     }
                 }
 
-                var summaryTask = steamClient.GetPlayerSummariesAsync(apiKey, new[] { friendSteamId });
-                var allRecentGamesTask = steamClient.GetAllRecentlyPlayedGamesAsync(apiKey, friendSteamId);
-                var friendsTask = GetExtendedFriendsAsync(apiKey, selfSteamId64);
-                var steamLevelTask = steamClient.GetSteamLevelAsync(apiKey, friendSteamId);
-                var badgesTask = steamClient.GetBadgesAsync(apiKey, friendSteamId);
+                var summaryTask = hybridClient.GetPlayerSummariesAsync(new[] { friendSteamId });
+                var allRecentGamesTask = hybridClient.GetAllRecentlyPlayedGamesAsync(friendSteamId);
+                var friendsTask = GetExtendedFriendsAsync(selfSteamId64);
+                var steamLevelTask = hybridClient.GetSteamLevelAsync(friendSteamId);
+                var badgesTask = hybridClient.GetBadgesAsync(friendSteamId);
 
                 await Task.WhenAll(summaryTask, allRecentGamesTask, friendsTask, steamLevelTask, badgesTask).ConfigureAwait(false);
 
@@ -1632,13 +1897,43 @@ namespace SteamFriendsFullscreen
             InvokeOnUi(() => Settings.IsSteamRunning = steamRunning);
 
 
-            var apiKey = Settings.SteamApiKey?.Trim();
-            var steamIdInput = Settings.SteamId64?.Trim();
-            var steamId64 = await ResolveSteamId64Async(apiKey, steamIdInput).ConfigureAwait(false);
-
-            // Not configured > reset
-            if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(steamId64))
+            if (!Settings.HasWebLoginSession && string.IsNullOrWhiteSpace(Settings.SteamApiKey))
             {
+                HandleSteamRefreshError(GetStringSafe(
+                    "LOCSteamFriends_WebLoginOrApiRequired",
+                    "Connect Steam with WebLogin or configure the optional API key fallback."));
+                return;
+            }
+
+            string steamId64;
+
+            try
+            {
+                steamId64 = await GetConfiguredSelfSteamId64Async().ConfigureAwait(false);
+            }
+            catch (SteamWebApiException ex)
+            {
+                logger.Error(ex, "Failed to resolve the configured Steam profile for the API fallback.");
+                HandleSteamRefreshError(GetSteamApiErrorMessage(ex));
+                return;
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Unexpected failure while resolving the configured Steam profile.");
+                HandleSteamRefreshError(GetStringSafe(
+                    "LOCSteamFriends_ErrorUnknown",
+                    "An unexpected error occurred while contacting Steam."));
+                return;
+            }
+
+            // WebLogin is preferred. The API key and profile are only required when no WebLogin session exists.
+            if (string.IsNullOrWhiteSpace(steamId64) ||
+                (!Settings.HasWebLoginSession && string.IsNullOrWhiteSpace(Settings.SteamApiKey)))
+            {
+                var configurationError = GetStringSafe(
+                    "LOCSteamFriends_WebLoginOrApiRequired",
+                    "Connect Steam with WebLogin or configure the optional API key fallback.");
+
                 InvokeOnUi(() =>
                 {
                     Settings.OnlineCount = 0;
@@ -1646,10 +1941,8 @@ namespace SteamFriendsFullscreen
                     Settings.OfflineCount = 0;
                     Settings.Friends.Clear();
 
-                    Settings.LastError = "Missing API key or Steam profile.";
+                    Settings.LastError = configurationError;
                     Settings.LastUpdateUtc = DateTime.MinValue;
-
-
                 });
 
                 lastUiSignature = null;
@@ -1673,23 +1966,65 @@ namespace SteamFriendsFullscreen
 
                 if (shouldRefreshFriendIds)
                 {
-                    var ids = await steamClient.GetFriendSteamIdsAsync(apiKey, steamId64).ConfigureAwait(false);
+                    var ids = await hybridClient.GetFriendSteamIdsAsync(steamId64).ConfigureAwait(false);
                     cachedFriendIds = ids != null ? ids.ToList() : new System.Collections.Generic.List<string>();
                     friendIdsLastFetchUtc = nowUtc;
                 }
 
-                // No friends
+                // A valid public list can legitimately contain no friends.
+                // Validate the account first so an invalid SteamID is not mistaken for an empty list.
                 if (cachedFriendIds == null || cachedFriendIds.Count == 0)
                 {
+                    var selfCheck = await hybridClient
+                        .GetPlayerSummariesAsync(new[] { steamId64 })
+                        .ConfigureAwait(false);
+                    var validSelf = selfCheck?.FirstOrDefault(p => p.SteamId == steamId64);
+
+                    if (validSelf == null)
+                    {
+                        InvokeOnUi(() =>
+                        {
+                            Settings.OnlineCount = 0;
+                            Settings.InGameCount = 0;
+                            Settings.OfflineCount = 0;
+                            Settings.Friends.Clear();
+                            Settings.LastError = GetStringSafe(
+                                "LOCSteamFriends_TestErrorProfileNotFound",
+                                "Steam could not find this profile. Check the profile link or SteamID64.");
+                            Settings.LastUpdateUtc = DateTime.MinValue;
+                        });
+
+                        lastUiSignature = null;
+                        return;
+                    }
+
+                    var emptyListSelfState = MapState(validSelf);
                     InvokeOnUi(() =>
                     {
                         Settings.OnlineCount = 0;
                         Settings.InGameCount = 0;
                         Settings.OfflineCount = 0;
                         Settings.Friends.Clear();
+                        Settings.SelfName = validSelf.PersonaName;
+                        Settings.SelfAvatar = validSelf.AvatarFull;
 
-                        Settings.LastError = "No friends returned (Steam API).";
-                        Settings.LastUpdateUtc = DateTime.MinValue;
+                        if (!steamRunning)
+                        {
+                            Settings.SelfState = "notrunning";
+                            Settings.SelfStateLoc = GetStringSafe("LOCSteamNotRunning", "Steam not running");
+                            Settings.SelfGame = null;
+                        }
+                        else
+                        {
+                            Settings.SelfState = emptyListSelfState;
+                            Settings.SelfStateLoc = LocalizeStateTheme(emptyListSelfState);
+                            Settings.SelfGame = string.IsNullOrWhiteSpace(validSelf.GameExtraInfo)
+                                ? null
+                                : validSelf.GameExtraInfo;
+                        }
+
+                        Settings.LastError = null;
+                        Settings.LastUpdateUtc = nowUtc;
                     });
 
                     lastUiSignature = "empty";
@@ -1705,7 +2040,7 @@ namespace SteamFriendsFullscreen
                     idsForSummaries.Add(steamId64);
                 }
 
-                var players = await steamClient.GetPlayerSummariesAsync(apiKey, idsForSummaries).ConfigureAwait(false);
+                var players = await hybridClient.GetPlayerSummariesAsync(idsForSummaries).ConfigureAwait(false);
 
                 // Self + friends split
                 var self = players?.FirstOrDefault(p => p.SteamId == steamId64);
@@ -1904,30 +2239,49 @@ namespace SteamFriendsFullscreen
 
                 lastSuccessUtc = nowUtc;
             }
-            catch (Exception ex)
+            catch (SteamHybridDataException ex)
+            {
+                logger.Error(ex, "Both Steam WebLogin and the optional API fallback are unavailable.");
+                HandleSteamRefreshError(ex.Message);
+            }
+            catch (SteamWebApiException ex)
             {
                 logger.Error(ex, "Failed to refresh Steam friends presence.");
-
-                if (DateTime.UtcNow - lastSuccessUtc > TimeSpan.FromMinutes(10))
-                {
-                    InvokeOnUi(() =>
-                    {
-                        Settings.OnlineCount = 0;
-                        Settings.InGameCount = 0;
-                        Settings.OfflineCount = 0;
-                        Settings.Friends.Clear();
-
-                        Settings.LastUpdateUtc = DateTime.MinValue;
-                        Settings.LastError = "Steam API error (no successful refresh for 10 minutes).";
-                    });
-
-                    lastUiSignature = null;
-                }
+                HandleSteamRefreshError(GetSteamApiErrorMessage(ex));
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ex, "Unexpected failure while refreshing Steam friends presence.");
+                HandleSteamRefreshError(GetStringSafe(
+                    "LOCSteamFriends_ErrorUnknown",
+                    "An unexpected error occurred while contacting Steam."));
             }
             finally
             {
                 isRefreshing = false;
             }
+        }
+
+        private void HandleSteamRefreshError(string errorMessage)
+        {
+            InvokeOnUi(() => Settings.LastError = errorMessage);
+
+            if (DateTime.UtcNow - lastSuccessUtc <= TimeSpan.FromMinutes(10))
+            {
+                return;
+            }
+
+            InvokeOnUi(() =>
+            {
+                Settings.OnlineCount = 0;
+                Settings.InGameCount = 0;
+                Settings.OfflineCount = 0;
+                Settings.Friends.Clear();
+                Settings.LastUpdateUtc = DateTime.MinValue;
+                Settings.LastError = errorMessage;
+            });
+
+            lastUiSignature = null;
         }
 
         // ===== Signature stable (anti-stutter) =====
@@ -2233,6 +2587,52 @@ namespace SteamFriendsFullscreen
 
 
 
+
+        private string GetSteamApiErrorMessage(SteamWebApiException exception)
+        {
+            if (exception == null)
+            {
+                return GetStringSafe(
+                    "LOCSteamFriends_ErrorUnknown",
+                    "An unexpected error occurred while contacting Steam.");
+            }
+
+            switch (exception.Kind)
+            {
+                case SteamWebApiErrorKind.InvalidApiKey:
+                    return GetStringSafe(
+                        "LOCSteamFriends_TestErrorInvalidApiKey",
+                        "Steam rejected the API key. Check that it is valid and active.");
+                case SteamWebApiErrorKind.FriendsListPrivate:
+                    return GetStringSafe(
+                        "LOCSteamFriends_TestErrorPrivateFriends",
+                        "The profile was found, but its Friends List is private. Set Friends List to Public in Steam privacy settings.");
+                case SteamWebApiErrorKind.RateLimited:
+                    return GetStringSafe(
+                        "LOCSteamFriends_TestErrorRateLimited",
+                        "Steam is temporarily limiting requests. Try again later.");
+                case SteamWebApiErrorKind.Timeout:
+                    return GetStringSafe(
+                        "LOCSteamFriends_TestErrorTimeout",
+                        "Steam did not respond in time. Check your connection and try again.");
+                case SteamWebApiErrorKind.Network:
+                    return GetStringSafe(
+                        "LOCSteamFriends_TestErrorNetwork",
+                        "The Steam Web API could not be reached. Check your Internet connection.");
+                case SteamWebApiErrorKind.SteamUnavailable:
+                    return GetStringSafe(
+                        "LOCSteamFriends_TestErrorUnavailable",
+                        "The Steam Web API is temporarily unavailable.");
+                case SteamWebApiErrorKind.InvalidResponse:
+                    return GetStringSafe(
+                        "LOCSteamFriends_TestErrorInvalidResponse",
+                        "Steam returned an invalid response.");
+                default:
+                    return GetStringSafe(
+                        "LOCSteamFriends_TestErrorApi",
+                        "Steam returned an unexpected API error.");
+            }
+        }
 
         private string GetStringSafe(string key, string fallback)
         {

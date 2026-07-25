@@ -80,6 +80,16 @@
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
 
+        <Style TargetType="PasswordBox">
+            <Setter Property="Foreground" Value="#EDEDED"/>
+            <Setter Property="Background" Value="#12000000"/>
+            <Setter Property="BorderBrush" Value="#2AFFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
         <Style TargetType="CheckBox">
             <Setter Property="Foreground" Value="#EDEDED"/>
             <Setter Property="Opacity" Value="0.95"/>
@@ -117,6 +127,98 @@
             </Setter>
         </Style>
 
+        <Style x:Key="MethodCard" TargetType="Border">
+            <Setter Property="CornerRadius" Value="9"/>
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="Background" Value="#0E000000"/>
+            <Setter Property="BorderBrush" Value="#24FFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="TextElement.Foreground" Value="#EDEDED"/>
+        </Style>
+
+        <Style x:Key="BadgeBase" TargetType="Border">
+            <Setter Property="CornerRadius" Value="999"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="RecommendedBadge" TargetType="Border" BasedOn="{StaticResource BadgeBase}">
+            <Setter Property="Background" Value="#2258C878"/>
+            <Setter Property="BorderBrush" Value="#5558C878"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style x:Key="OptionalBadge" TargetType="Border" BasedOn="{StaticResource BadgeBase}">
+            <Setter Property="Background" Value="#16000000"/>
+            <Setter Property="BorderBrush" Value="#2AFFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style x:Key="BadgeText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Opacity" Value="0.9"/>
+        </Style>
+
+        <Style x:Key="CleanExpander" TargetType="Expander">
+            <Setter Property="Foreground" Value="#EDEDED"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Expander">
+                        <StackPanel>
+                            <ToggleButton x:Name="HeaderToggle"
+                                          Content="{TemplateBinding Header}"
+                                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                          Focusable="False"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          HorizontalContentAlignment="Stretch">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="HeaderBorder"
+                                                Background="Transparent"
+                                                CornerRadius="7"
+                                                Padding="6,8">
+                                            <DockPanel LastChildFill="True">
+                                                <TextBlock x:Name="Arrow"
+                                                           Text="›"
+                                                           FontSize="18"
+                                                           Width="20"
+                                                           Margin="0,-1,4,0"
+                                                           VerticalAlignment="Top"
+                                                           Foreground="#72D7E3"/>
+                                                <ContentPresenter Content="{TemplateBinding Content}"
+                                                                  VerticalAlignment="Center"/>
+                                            </DockPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="HeaderBorder" Property="Background" Value="#10FFFFFF"/>
+                                            </Trigger>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="Arrow" Property="Text" Value="⌄"/>
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter Property="Opacity" Value="0.45"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+
+                            <ContentPresenter x:Name="ExpandSite"
+                                              ContentSource="Content"
+                                              Visibility="Collapsed"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded" Value="True">
+                                <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
     </UserControl.Resources>
 
@@ -135,33 +237,523 @@
                        TextWrapping="Wrap"
                        Margin="0,0,0,14"/>
 
-            <!-- SETUP -->
+            <!-- STEAM CONNECTION -->
             <Border Style="{StaticResource CardBorder}">
-                <StackPanel>
-                    <TextBlock TextWrapping="Wrap" Text="{DynamicResource LOCSteamFriends_Setup}" Style="{StaticResource SectionTitle}"/>
+                <StackPanel TextElement.Foreground="#EDEDED">
+                    <TextBlock Text="{DynamicResource LOCSteamFriends_ConnectTitle}"
+                               Style="{StaticResource SectionTitle}"
+                               Margin="0,0,0,4"/>
 
-                    <TextBlock TextWrapping="Wrap" Text="{DynamicResource LOCSteamFriends_ApiKey}" Style="{StaticResource Label}"/>
-                    <TextBox Text="{Binding Settings.SteamApiKey, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,0,0,10"/>
+                    <TextBlock Text="{DynamicResource LOCSteamFriends_ConnectionIntro}"
+                               Style="{StaticResource Help}"
+                               Margin="0,0,0,14"/>
 
-                    <TextBlock TextWrapping="Wrap" Text="{DynamicResource LOCSteamFriends_Profile}" Style="{StaticResource Label}"/>
-                    <TextBox Text="{Binding Settings.SteamId64, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,0,0,0"/>
-
-                    <TextBlock Style="{StaticResource Help}"
-                               TextWrapping="Wrap"
-                               Text="{DynamicResource LOCSteamFriends_ProfileHelp}"/>
-
-                    <!-- IMPORTANT: Steam privacy requirement -->
-                    <Border Margin="0,10,0,0"
-                            Padding="10,8"
-                            CornerRadius="8"
-                            Background="#22FFB300"
-                            BorderBrush="#55FFB300"
+                    <!-- First setup: no QR session and no API key -->
+                    <Border Padding="16"
+                            CornerRadius="9"
+                            Background="#0E000000"
+                            BorderBrush="#24FFFFFF"
                             BorderThickness="1">
-                        <TextBlock Text="{DynamicResource LOCSteamFriends_PrivacyNotice}" TextWrapping="Wrap" Opacity="0.95"/>
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding Settings.HasWebLoginSession}" Value="False"/>
+                                            <Condition Binding="{Binding Settings.SteamApiKey}" Value=""/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </MultiDataTrigger>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding Settings.HasWebLoginSession}" Value="False"/>
+                                            <Condition Binding="{Binding Settings.SteamApiKey}" Value="{x:Null}"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </MultiDataTrigger>
+                                    <DataTrigger Binding="{Binding Settings.WebLoginState}"
+                                                 Value="{x:Static local:SteamWebLoginState.Connecting}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Settings.WebLoginState}"
+                                                 Value="{x:Static local:SteamWebLoginState.WaitingForScan}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Settings.WebLoginState}"
+                                                 Value="{x:Static local:SteamWebLoginState.Refreshing}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0"
+                                        Margin="0,0,20,0"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="{DynamicResource LOCSteamFriends_WebLoginConnect}"
+                                           FontWeight="SemiBold"
+                                           FontSize="14"/>
+                                <TextBlock Text="{DynamicResource LOCSteamFriends_QrRecommendedDescription}"
+                                           TextWrapping="Wrap"
+                                           Opacity="0.72"
+                                           Margin="0,4,0,0"/>
+
+                                <TextBlock Text="{Binding Settings.WebLoginStatusMessage}"
+                                           TextWrapping="Wrap"
+                                           Foreground="#E8B84A"
+                                           Margin="0,8,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Settings.WebLoginState}"
+                                                             Value="{x:Static local:SteamWebLoginState.Error}">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+
+                            <Button Grid.Column="1"
+                                    Content="{DynamicResource LOCSteamFriends_WebLoginConnect}"
+                                    Padding="18,9"
+                                    VerticalAlignment="Center"
+                                    IsEnabled="{Binding Settings.CanConnectWebLogin}"
+                                    Click="ConnectSteamWebLogin_Click"/>
+                        </Grid>
                     </Border>
 
+                    <!-- QR / connection in progress -->
+                    <Border Padding="16"
+                            CornerRadius="9"
+                            Background="#0E000000"
+                            BorderBrush="#24FFFFFF"
+                            BorderThickness="1">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Settings.WebLoginState}"
+                                                 Value="{x:Static local:SteamWebLoginState.Connecting}">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Settings.WebLoginState}"
+                                                 Value="{x:Static local:SteamWebLoginState.WaitingForScan}">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Settings.WebLoginState}"
+                                                 Value="{x:Static local:SteamWebLoginState.Refreshing}">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <Border Width="10"
+                                            Height="10"
+                                            CornerRadius="5"
+                                            Background="#E8B84A"
+                                            Margin="0,0,9,0"/>
+                                    <TextBlock Text="{Binding Settings.WebLoginStatusMessage}"
+                                               TextWrapping="Wrap"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <Button Grid.Column="1"
+                                        Content="{DynamicResource LOCSteamFriends_WebLoginDisconnect}"
+                                        Padding="12,8"
+                                        Margin="16,0,0,0"
+                                        IsEnabled="{Binding Settings.CanDisconnectWebLogin}"
+                                        Click="DisconnectSteamWebLogin_Click"/>
+                            </Grid>
+
+                            <Image Source="{Binding Settings.WebLoginQrImage}"
+                                   Width="210"
+                                   Height="210"
+                                   Stretch="Uniform"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,16,0,0">
+                                <Image.Style>
+                                    <Style TargetType="Image">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Settings.WebLoginState}"
+                                                         Value="{x:Static local:SteamWebLoginState.WaitingForScan}">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Image.Style>
+                            </Image>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Connected with QR -->
+                    <Border Padding="14,12"
+                            CornerRadius="9"
+                            Background="#1428A745"
+                            BorderBrush="#5528A745"
+                            BorderThickness="1">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Settings.HasWebLoginSession}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Settings.WebLoginState}"
+                                                 Value="{x:Static local:SteamWebLoginState.Connecting}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Settings.WebLoginState}"
+                                                 Value="{x:Static local:SteamWebLoginState.WaitingForScan}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Settings.WebLoginState}"
+                                                 Value="{x:Static local:SteamWebLoginState.Refreshing}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0"
+                                        Margin="0,0,18,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="10"
+                                            Height="10"
+                                            CornerRadius="5"
+                                            Background="#58C878"
+                                            Margin="0,4,9,0"/>
+                                    <TextBlock Text="{Binding Settings.WebLoginStatusMessage}"
+                                               TextWrapping="Wrap"
+                                               FontWeight="SemiBold"/>
+                                </StackPanel>
+
+                                <TextBlock TextWrapping="Wrap"
+                                           Opacity="0.72"
+                                           Margin="19,4,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="{DynamicResource LOCSteamFriends_WebConnectedDescription}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Settings.ActiveDataSource}"
+                                                             Value="{x:Static local:SteamActiveDataSource.ApiKeyFallback}">
+                                                    <Setter Property="Text" Value="{DynamicResource LOCSteamFriends_FallbackActiveCompact}"/>
+                                                    <Setter Property="Foreground" Value="#E8B84A"/>
+                                                    <Setter Property="Opacity" Value="0.95"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <TextBlock Text="{DynamicResource LOCSteamFriends_BackupReadyCompact}"
+                                           TextWrapping="Wrap"
+                                           Foreground="#8DE0A3"
+                                           Margin="19,5,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Settings.SteamApiKey}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Settings.SteamApiKey}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Settings.ActiveDataSource}"
+                                                             Value="{x:Static local:SteamActiveDataSource.ApiKeyFallback}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+
+                            <Button Grid.Column="1"
+                                    Content="{DynamicResource LOCSteamFriends_WebLoginDisconnect}"
+                                    Padding="12,8"
+                                    VerticalAlignment="Center"
+                                    IsEnabled="{Binding Settings.CanDisconnectWebLogin}"
+                                    Click="DisconnectSteamWebLogin_Click"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- API key only -->
+                    <Border Padding="14,12"
+                            CornerRadius="9"
+                            Background="#1428A745"
+                            BorderBrush="#5528A745"
+                            BorderThickness="1">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Settings.SteamApiKey}" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Settings.SteamApiKey}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Settings.HasWebLoginSession}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Settings.WebLoginState}"
+                                                 Value="{x:Static local:SteamWebLoginState.Connecting}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Settings.WebLoginState}"
+                                                 Value="{x:Static local:SteamWebLoginState.WaitingForScan}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Settings.WebLoginState}"
+                                                 Value="{x:Static local:SteamWebLoginState.Refreshing}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0"
+                                        Margin="0,0,18,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="10"
+                                            Height="10"
+                                            CornerRadius="5"
+                                            Background="#58C878"
+                                            Margin="0,4,9,0"/>
+                                    <TextBlock FontWeight="SemiBold">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="{DynamicResource LOCSteamFriends_ApiConfiguredTitle}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Settings.ActiveDataSource}"
+                                                                 Value="{x:Static local:SteamActiveDataSource.ApiKeyFallback}">
+                                                        <Setter Property="Text" Value="{DynamicResource LOCSteamFriends_ApiOnlyReadyTitle}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                                <TextBlock TextWrapping="Wrap"
+                                           Opacity="0.72"
+                                           Margin="19,4,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="{DynamicResource LOCSteamFriends_ApiOnlyConfiguredDescription}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Settings.ActiveDataSource}"
+                                                             Value="{x:Static local:SteamActiveDataSource.ApiKeyFallback}">
+                                                    <Setter Property="Text" Value="{DynamicResource LOCSteamFriends_ApiOnlyReadyDescription}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="{DynamicResource LOCSteamFriends_ApiOnlyWebBenefit}"
+                                           TextWrapping="Wrap"
+                                           Opacity="0.62"
+                                           Margin="19,5,0,0"/>
+                            </StackPanel>
+
+                            <Button Grid.Column="1"
+                                    Content="{DynamicResource LOCSteamFriends_WebLoginConnectOptional}"
+                                    Padding="14,8"
+                                    VerticalAlignment="Center"
+                                    IsEnabled="{Binding Settings.CanConnectWebLogin}"
+                                    Click="ConnectSteamWebLogin_Click"/>
+                        </Grid>
+                    </Border>
+
+                    <Separator Style="{StaticResource Divider}"
+                               Margin="0,10,0,4"/>
+
+                    <!-- API option / backup -->
+                    <Expander IsExpanded="False"
+                              Style="{StaticResource CleanExpander}">
+                        <Expander.Header>
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold"
+                                           Foreground="#EDEDED">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="{DynamicResource LOCSteamFriends_ApiConfiguredTitle}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Settings.SteamApiKey}" Value="">
+                                                    <Setter Property="Text" Value="{DynamicResource LOCSteamFriends_ApiAlternativeHeader}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Settings.SteamApiKey}" Value="{x:Null}">
+                                                    <Setter Property="Text" Value="{DynamicResource LOCSteamFriends_ApiAlternativeHeader}"/>
+                                                </DataTrigger>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding Settings.HasWebLoginSession}" Value="True"/>
+                                                        <Condition Binding="{Binding Settings.SteamApiKey}" Value=""/>
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Text" Value="{DynamicResource LOCSteamFriends_ApiBackupHeader}"/>
+                                                </MultiDataTrigger>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding Settings.HasWebLoginSession}" Value="True"/>
+                                                        <Condition Binding="{Binding Settings.SteamApiKey}" Value="{x:Null}"/>
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Text" Value="{DynamicResource LOCSteamFriends_ApiBackupHeader}"/>
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <TextBlock TextWrapping="Wrap"
+                                           FontSize="12"
+                                           Opacity="0.62"
+                                           Margin="0,2,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="{DynamicResource LOCSteamFriends_ApiConfiguredDescription}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Settings.SteamApiKey}" Value="">
+                                                    <Setter Property="Text" Value="{DynamicResource LOCSteamFriends_ApiAlternativeDescription}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Settings.SteamApiKey}" Value="{x:Null}">
+                                                    <Setter Property="Text" Value="{DynamicResource LOCSteamFriends_ApiAlternativeDescription}"/>
+                                                </DataTrigger>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding Settings.HasWebLoginSession}" Value="True"/>
+                                                        <Condition Binding="{Binding Settings.SteamApiKey}" Value=""/>
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Text" Value="{DynamicResource LOCSteamFriends_ApiBackupDescription}"/>
+                                                </MultiDataTrigger>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding Settings.HasWebLoginSession}" Value="True"/>
+                                                        <Condition Binding="{Binding Settings.SteamApiKey}" Value="{x:Null}"/>
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Text" Value="{DynamicResource LOCSteamFriends_ApiBackupDescription}"/>
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </Expander.Header>
+
+                        <Border Margin="0,8,0,0"
+                                Padding="14"
+                                CornerRadius="9"
+                                Background="#0E000000"
+                                BorderBrush="#24FFFFFF"
+                                BorderThickness="1"
+                                TextElement.Foreground="#EDEDED">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource LOCSteamFriends_ApiKey}"
+                                           Style="{StaticResource Label}"/>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <PasswordBox Grid.Column="0"
+                                                 local:PasswordBoxBinding.BindPassword="True"
+                                                 local:PasswordBoxBinding.BoundPassword="{Binding Settings.SteamApiKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 IsEnabled="{Binding Settings.CanTestSteamConnection}"/>
+
+                                    <Button Grid.Column="1"
+                                            Content="{DynamicResource LOCSteamFriends_TestApiFallback}"
+                                            Margin="10,0,0,0"
+                                            Padding="12,8"
+                                            VerticalAlignment="Stretch"
+                                            IsEnabled="{Binding Settings.CanTestSteamConnection}"
+                                            Click="TestSteamConnection_Click"/>
+                                </Grid>
+
+                                <TextBlock Text="{DynamicResource LOCSteamFriends_Profile}"
+                                           Style="{StaticResource Label}"
+                                           Margin="0,12,0,4"/>
+                                <TextBox Text="{Binding Settings.SteamId64, UpdateSourceTrigger=PropertyChanged}"
+                                         IsEnabled="{Binding Settings.CanTestSteamConnection}"/>
+                                <TextBlock Text="{DynamicResource LOCSteamFriends_ProfileHelp}"
+                                           Style="{StaticResource Help}"/>
+
+                                <TextBlock Text="{DynamicResource LOCSteamFriends_ApiPublicNote}"
+                                           TextWrapping="Wrap"
+                                           Foreground="#E8B84A"
+                                           Opacity="0.85"
+                                           Margin="0,10,0,0"/>
+
+                                <Border Margin="0,10,0,0"
+                                        Padding="10,8"
+                                        CornerRadius="8"
+                                        BorderThickness="1">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Setter Property="Background" Value="#22000000"/>
+                                            <Setter Property="BorderBrush" Value="#44FFFFFF"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Settings.ConnectionTestState}"
+                                                             Value="{x:Static local:SteamConnectionTestState.Running}">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Settings.ConnectionTestState}"
+                                                             Value="{x:Static local:SteamConnectionTestState.Success}">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Setter Property="Background" Value="#2228A745"/>
+                                                    <Setter Property="BorderBrush" Value="#6628A745"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Settings.ConnectionTestState}"
+                                                             Value="{x:Static local:SteamConnectionTestState.Error}">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Setter Property="Background" Value="#22D9534F"/>
+                                                    <Setter Property="BorderBrush" Value="#66D9534F"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="{Binding Settings.SteamConnectionTestMessage}"
+                                               TextWrapping="Wrap"/>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </Expander>
                 </StackPanel>
             </Border>
 
@@ -170,7 +762,7 @@
                 <StackPanel>
                     <TextBlock TextWrapping="Wrap" Text="{DynamicResource LOCSteamFriends_Display}" Style="{StaticResource SectionTitle}"/>
 
-                    <StackPanel Style="{StaticResource NeedsApiKeyBlock}">
+                    <StackPanel>
                         <TextBlock TextWrapping="Wrap" Text="{DynamicResource LOCSteamFriends_OnlineInfo}" Style="{StaticResource Label}"/>
 
                         <CheckBox Content="{DynamicResource LOCSteamFriends_ShowOffline}"

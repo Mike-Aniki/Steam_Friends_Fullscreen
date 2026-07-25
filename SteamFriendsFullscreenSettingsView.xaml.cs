@@ -22,6 +22,34 @@ namespace SteamFriendsFullscreen
             InitializeComponent();
         }
 
+        private async void ConnectSteamWebLogin_Click(object sender, RoutedEventArgs e)
+        {
+            var viewModel = DataContext as SteamFriendsFullscreenSettingsViewModel;
+            if (viewModel == null)
+            {
+                return;
+            }
+
+            await viewModel.ConnectSteamWebLoginAsync();
+        }
+
+        private void DisconnectSteamWebLogin_Click(object sender, RoutedEventArgs e)
+        {
+            var viewModel = DataContext as SteamFriendsFullscreenSettingsViewModel;
+            viewModel?.DisconnectSteamWebLogin();
+        }
+
+        private async void TestSteamConnection_Click(object sender, RoutedEventArgs e)
+        {
+            var viewModel = DataContext as SteamFriendsFullscreenSettingsViewModel;
+            if (viewModel == null)
+            {
+                return;
+            }
+
+            await viewModel.TestSteamConnectionAsync();
+        }
+
         private void TestNotification_Click(object sender, RoutedEventArgs e)
         {
             try

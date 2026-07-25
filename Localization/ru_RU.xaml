@@ -1,4 +1,4 @@
-<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" 
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" 
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" 
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
@@ -64,10 +64,101 @@
     <sys:String x:Key="LOCSteamFriends_StateAway">отсутствует</sys:String>
     <sys:String x:Key="LOCSteamFriends_StateBusy">занят</sys:String>
     <sys:String x:Key="LOCSteamFriends_StateOffline">не в сети</sys:String>
+    <sys:String x:Key="LOCSteamFriends_StateSnooze">Неактивен</sys:String>
 
-    <sys:String x:Key="LOCSteamFriends_PrivacyNotice">
-        ВАЖНО: Ваш профиль Steam и список друзей должны быть установлены как Публичные, иначе Steam Web API не вернёт данные, и плагин покажет устаревшие данные.
-    </sys:String>
 
+    <!-- Steam connection test -->
+    <sys:String x:Key="LOCSteamFriends_TestConnection">Проверить подключение к Steam</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestConnectionRunning">Проверка подключения к Steam...</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestSuccess">Подключение успешно: {0} — найдено друзей: {1}.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestSuccessNoFriends">Подключение успешно: {0}. Друзья не найдены.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorMissingApiKey">Введите ключ Steam Web API.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorApiKeyFormat">Неверный формат ключа API. Ключ Steam Web API содержит 32 шестнадцатеричных символа.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorMissingProfile">Введите ссылку на профиль Steam, пользовательское имя или SteamID64.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorProfileFormat">Неверный формат профиля Steam.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorProfileNotFound">Steam не удалось найти этот профиль. Проверьте ссылку на профиль или SteamID64.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorInvalidApiKey">Steam отклонил ключ API. Проверьте, что он действителен и активен.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorPrivateFriends">Профиль найден, но список друзей скрыт. Установите для списка друзей значение «Открытый» в настройках приватности Steam.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorRateLimited">Steam временно ограничивает количество запросов. Повторите попытку позже.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorTimeout">Steam не ответил вовремя. Проверьте подключение и повторите попытку.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorNetwork">Не удалось подключиться к Steam Web API. Проверьте подключение к Интернету.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorUnavailable">Steam Web API временно недоступен.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorInvalidResponse">Steam вернул некорректный ответ.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorApi">Steam вернул неожиданную ошибку API.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorUnknown">При проверке подключения к Steam произошла неожиданная ошибка.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ErrorUnknown">При подключении к Steam произошла неожиданная ошибка.</sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_PrivacyNotice">ВАЖНО: список друзей Steam должен быть установлен как «Открытый». Сам профиль может оставаться закрытым, но некоторые сведения об активности могут быть скрыты.</sys:String>
+
+
+
+    <!-- Steam WebLogin and optional API fallback -->
+    <sys:String x:Key="LOCSteamFriends_WebLoginTitle">Аккаунт Steam</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginDescription">Подключите аккаунт Steam, чтобы получать список друзей и их активность. WebLogin всегда используется первым.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginConnecting">Подключение к Steam...</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginDisconnected">Steam WebLogin не подключён.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginScanQr">Отсканируйте QR-код в мобильном приложении Steam и подтвердите вход.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginConnectedAs">Подключено как {0}.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginError">Ошибка Steam WebLogin. Повторите попытку или используйте необязательный API-ключ как резерв.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginConnect">Подключиться к Steam</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginDisconnect">Отключиться</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ActiveSource">Текущий источник данных</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ActiveSourceNone">Сейчас нет доступного источника данных Steam.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ActiveSourceWebLogin">Steam WebLogin</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ActiveSourceApiFallback">Ключ Steam Web API — резерв</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiFallbackTitle">Необязательный резерв через API</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiFallbackDescription">Используется только при недоступности WebLogin. Этот раздел можно оставить пустым.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestApiFallback">Проверить API-ключ</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiFallbackPrivacyNotice">Для резервного API-доступа список друзей настроенного аккаунта должен быть публичным. При работающем WebLogin это ограничение не действует.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginOrApiRequired">Подключите Steam через WebLogin или настройте необязательный резервный API-ключ.</sys:String>
+    <!-- Friendly Steam connection method cards -->
+    <sys:String x:Key="LOCSteamFriends_ConnectTitle">Подключение к Steam</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ConnectChoiceHelp">Выберите один способ или используйте оба для автоматического резерва.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_QrMethodTitle">Вход в Steam по QR-коду</sys:String>
+    <sys:String x:Key="LOCSteamFriends_RecommendedBadge">Рекомендуется</sys:String>
+    <sys:String x:Key="LOCSteamFriends_QrBenefitQuick">Быстрое и простое подключение</sys:String>
+    <sys:String x:Key="LOCSteamFriends_QrBenefitPrivate">Не нужно делать список друзей Steam общедоступным</sys:String>
+    <sys:String x:Key="LOCSteamFriends_QrWarningReconnect">Иногда может потребоваться повторный вход</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiMethodTitle">Ключ Steam Web API</sys:String>
+    <sys:String x:Key="LOCSteamFriends_OptionalBackupBadge">Необязательный резерв</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiBenefitStable">Нет сессии Steam, которую нужно переподключать</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiBenefitFallback">Автоматически используется, если вход по QR-коду недоступен</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiWarningCreateKey">Требуется создать ключ Steam Web API</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiWarningPublicList">Ваш список друзей Steam должен быть общедоступным</sys:String>
+    <sys:String x:Key="LOCSteamFriends_SetupBackupReadyTitle">Резерв готов</sys:String>
+    <sys:String x:Key="LOCSteamFriends_SetupBackupReadyDescription">Сначала используется вход по QR-коду. Ключ API автоматически подхватывает работу, если сессия Steam недоступна.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_SetupQrOnlyTitle">Используется вход по QR-коду</sys:String>
+    <sys:String x:Key="LOCSteamFriends_SetupQrOnlyDescription">Добавьте ключ API ниже, если также нужен автоматический резерв.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_SetupApiOnlyTitle">Используется ключ API</sys:String>
+    <sys:String x:Key="LOCSteamFriends_SetupApiOnlyDescription">Этот способ можно использовать отдельно или подключиться по QR-коду для доступа к информации, доступной только друзьям.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_SetupNoneTitle">Подключение не настроено</sys:String>
+    <sys:String x:Key="LOCSteamFriends_SetupNoneDescription">Подключитесь по QR-коду, добавьте ключ API или используйте оба способа.</sys:String>
+
+    <!-- Progressive connection screen -->
+    <sys:String x:Key="LOCSteamFriends_SimpleIntro">Самый простой способ показать друзей Steam в Playnite.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_QrShortHelp">Быстрая настройка с помощью QR-кода. Список друзей Steam может оставаться закрытым.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiAlternativeHeader">Использовать ключ API вместо этого</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiBackupHeader">Добавить резервный ключ API</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiSettingsHeader">Настройки ключа API</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiSimpleDescription">Используйте этот способ без входа по QR-коду или как дополнительный резервный вариант.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiPublicNote">При использовании этого способа список друзей Steam должен быть общедоступным.</sys:String>
+
+
+    <!-- Final user-friendly Steam connection screen -->
+    <sys:String x:Key="LOCSteamFriends_ConnectionIntro">Выберите удобный вариант. Второй способ можно добавить позже как автоматический резерв.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_QrRecommendedDescription">Отсканируйте QR-код. Ключ API не нужен, а список друзей Steam может оставаться закрытым.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiOnlyReadyTitle">Друзья Steam готовы</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiOnlyReadyDescription">Сейчас используется ваш ключ API.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginConnectOptional">Подключить Steam (необязательно)</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiOnlyWebBenefit">Вход по QR-коду позволяет получать данные только для друзей, не открывая список друзей для всех.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebConnectedDescription">Подключено по QR-коду. Список друзей может оставаться закрытым.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_BackupReadyCompact">Резерв через API готов. Он включится автоматически, если подключение Steam станет недоступно.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_FallbackActiveCompact">Пока подключение Steam недоступно, используется резерв через API.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiAlternativeDescription">Используйте ключ API без входа по QR-коду.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiBackupDescription">Позволяет плагину продолжать работу, если Steam попросит войти снова.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiConfiguredTitle">Ключ API настроен</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiConfiguredDescription">Просмотрите, проверьте или замените сохранённый ключ API.</sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_ApiOnlyConfiguredDescription">Плагин может использовать этот способ без входа по QR-коду.</sys:String>
 
 </ResourceDictionary>

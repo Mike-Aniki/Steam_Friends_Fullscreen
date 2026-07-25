@@ -1,4 +1,4 @@
-<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" 
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" 
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" 
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
@@ -64,10 +64,101 @@ Oznámení Windows používají systémové centrum oznámení a fungují v rež
     <sys:String x:Key="LOCSteamFriends_StateAway">pryč</sys:String>
     <sys:String x:Key="LOCSteamFriends_StateBusy">zaneprázdněn</sys:String>
     <sys:String x:Key="LOCSteamFriends_StateOffline">offline</sys:String>
+    <sys:String x:Key="LOCSteamFriends_StateSnooze">Dřímá</sys:String>
 
-    <sys:String x:Key="LOCSteamFriends_PrivacyNotice">
-        DŮLEŽITÉ: Váš profil na Steamu i seznam přátel musí být nastaveny jako Veřejné, jinak Steam Web API nevrátí žádná data a plugin zobrazí zastaralá data.
-    </sys:String>
 
+    <!-- Steam connection test -->
+    <sys:String x:Key="LOCSteamFriends_TestConnection">Otestovat připojení ke Steamu</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestConnectionRunning">Testování připojení ke Steamu...</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestSuccess">Připojení bylo úspěšné: {0} — nalezeno přátel: {1}.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestSuccessNoFriends">Připojení bylo úspěšné: {0}. Nebyli nalezeni žádní přátelé.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorMissingApiKey">Zadejte svůj klíč Steam Web API.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorApiKeyFormat">Formát klíče API je neplatný. Klíč Steam Web API obsahuje 32 hexadecimálních znaků.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorMissingProfile">Zadejte odkaz na profil Steam, vlastní název nebo SteamID64.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorProfileFormat">Formát profilu Steam je neplatný.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorProfileNotFound">Steam tento profil nenašel. Zkontrolujte odkaz na profil nebo SteamID64.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorInvalidApiKey">Steam odmítl klíč API. Zkontrolujte, zda je platný a aktivní.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorPrivateFriends">Profil byl nalezen, ale seznam přátel je soukromý. Nastavte seznam přátel v nastavení soukromí Steamu jako Veřejný.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorRateLimited">Steam dočasně omezuje požadavky. Zkuste to znovu později.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorTimeout">Steam neodpověděl včas. Zkontrolujte připojení a zkuste to znovu.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorNetwork">Steam Web API není dostupné. Zkontrolujte připojení k internetu.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorUnavailable">Steam Web API je dočasně nedostupné.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorInvalidResponse">Steam vrátil neplatnou odpověď.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorApi">Steam vrátil neočekávanou chybu API.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestErrorUnknown">Při testování připojení ke Steamu došlo k neočekávané chybě.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ErrorUnknown">Při komunikaci se Steamem došlo k neočekávané chybě.</sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_PrivacyNotice">DŮLEŽITÉ: Seznam přátel na Steamu musí být nastaven jako Veřejný. Samotný profil může zůstat soukromý, ale některé informace o aktivitě pak mohou být skryté.</sys:String>
+
+
+
+    <!-- Steam WebLogin and optional API fallback -->
+    <sys:String x:Key="LOCSteamFriends_WebLoginTitle">Účet Steam</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginDescription">Připojte svůj účet Steam pro načtení přátel a jejich aktivity. WebLogin se vždy používá jako první.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginConnecting">Připojování ke službě Steam...</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginDisconnected">Steam WebLogin není připojen.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginScanQr">Naskenujte QR kód v mobilní aplikaci Steam a potvrďte přihlášení.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginConnectedAs">Připojeno jako {0}.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginError">Steam WebLogin selhal. Zkuste to znovu nebo použijte volitelný API klíč jako zálohu.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginConnect">Připojit ke službě Steam</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginDisconnect">Odpojit</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ActiveSource">Aktuálně používaný zdroj dat</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ActiveSourceNone">Momentálně není dostupný žádný zdroj dat Steam.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ActiveSourceWebLogin">Steam WebLogin</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ActiveSourceApiFallback">Klíč Steam Web API — záloha</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiFallbackTitle">Volitelná záloha přes API</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiFallbackDescription">Použije se pouze tehdy, když WebLogin není dostupný. Tuto část můžete nechat prázdnou.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_TestApiFallback">Otestovat API klíč</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiFallbackPrivacyNotice">Záloha přes API vyžaduje veřejný seznam přátel nastaveného účtu. Toto omezení neplatí, když WebLogin funguje.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginOrApiRequired">Připojte Steam přes WebLogin nebo nastavte volitelný záložní API klíč.</sys:String>
+    <!-- Friendly Steam connection method cards -->
+    <sys:String x:Key="LOCSteamFriends_ConnectTitle">Připojení ke službě Steam</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ConnectChoiceHelp">Vyberte jednu metodu nebo použijte obě pro automatickou zálohu.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_QrMethodTitle">Přihlášení ke službě Steam pomocí QR kódu</sys:String>
+    <sys:String x:Key="LOCSteamFriends_RecommendedBadge">Doporučeno</sys:String>
+    <sys:String x:Key="LOCSteamFriends_QrBenefitQuick">Rychlé a snadné připojení</sys:String>
+    <sys:String x:Key="LOCSteamFriends_QrBenefitPrivate">Seznam přátel na Steamu nemusí být veřejný</sys:String>
+    <sys:String x:Key="LOCSteamFriends_QrWarningReconnect">Občas může být nutné se znovu připojit</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiMethodTitle">Klíč Steam Web API</sys:String>
+    <sys:String x:Key="LOCSteamFriends_OptionalBackupBadge">Volitelná záloha</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiBenefitStable">Žádná relace Steam, kterou je třeba znovu připojovat</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiBenefitFallback">Použije se automaticky, pokud přihlášení přes QR není dostupné</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiWarningCreateKey">Vyžaduje vytvoření klíče Steam Web API</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiWarningPublicList">Váš seznam přátel na Steamu musí být veřejný</sys:String>
+    <sys:String x:Key="LOCSteamFriends_SetupBackupReadyTitle">Záloha je připravena</sys:String>
+    <sys:String x:Key="LOCSteamFriends_SetupBackupReadyDescription">Nejprve se použije přihlášení přes QR. Pokud relace Steam není dostupná, automaticky ji převezme klíč API.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_SetupQrOnlyTitle">Používá se přihlášení přes QR</sys:String>
+    <sys:String x:Key="LOCSteamFriends_SetupQrOnlyDescription">Přidejte níže klíč API, pokud chcete také automatickou zálohu.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_SetupApiOnlyTitle">Používá se klíč API</sys:String>
+    <sys:String x:Key="LOCSteamFriends_SetupApiOnlyDescription">Tuto metodu můžete používat samostatně nebo se připojit přes QR pro přístup k informacím viditelným jen pro přátele.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_SetupNoneTitle">Připojení není nastaveno</sys:String>
+    <sys:String x:Key="LOCSteamFriends_SetupNoneDescription">Připojte se přes QR, přidejte klíč API nebo použijte obě metody.</sys:String>
+
+    <!-- Progressive connection screen -->
+    <sys:String x:Key="LOCSteamFriends_SimpleIntro">Nejjednodušší způsob, jak zobrazit přátele ze Steamu v Playnite.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_QrShortHelp">Rychlé nastavení pomocí QR kódu. Váš seznam přátel na Steamu může zůstat soukromý.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiAlternativeHeader">Místo toho použít klíč API</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiBackupHeader">Přidat záložní klíč API</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiSettingsHeader">Nastavení klíče API</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiSimpleDescription">Použijte tuto metodu bez přihlášení pomocí QR kódu nebo jako volitelnou zálohu.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiPublicNote">Při použití této metody musí být váš seznam přátel na Steamu veřejný.</sys:String>
+
+
+    <!-- Final user-friendly Steam connection screen -->
+    <sys:String x:Key="LOCSteamFriends_ConnectionIntro">Vyberte možnost, která vám vyhovuje. Druhou můžete později přidat jako automatickou zálohu.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_QrRecommendedDescription">Naskenujte QR kód. Není potřeba API klíč a váš seznam přátel na Steamu může zůstat soukromý.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiOnlyReadyTitle">Přátelé na Steamu jsou připraveni</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiOnlyReadyDescription">Právě se používá váš API klíč.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebLoginConnectOptional">Připojit ke Steamu (volitelné)</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiOnlyWebBenefit">Přihlášení pomocí QR kódu může načíst informace viditelné jen přátelům, aniž by byl seznam přátel veřejný.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_WebConnectedDescription">Připojeno pomocí QR kódu. Seznam přátel může zůstat soukromý.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_BackupReadyCompact">Záloha přes API je připravena. Automaticky převezme provoz, pokud připojení ke Steamu nebude dostupné.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_FallbackActiveCompact">Dokud není připojení ke Steamu dostupné, používá se záloha přes API.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiAlternativeDescription">Použijte API klíč bez přihlášení pomocí QR kódu.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiBackupDescription">Udrží plugin funkční, pokud vás Steam požádá o nové přihlášení.</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiConfiguredTitle">API klíč je nastaven</sys:String>
+    <sys:String x:Key="LOCSteamFriends_ApiConfiguredDescription">Zobrazte, otestujte nebo nahraďte uložený API klíč.</sys:String>
+
+    <sys:String x:Key="LOCSteamFriends_ApiOnlyConfiguredDescription">Plugin může tuto metodu používat bez přihlášení pomocí QR kódu.</sys:String>
 
 </ResourceDictionary>
